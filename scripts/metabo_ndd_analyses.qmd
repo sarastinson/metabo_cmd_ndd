@@ -439,75 +439,10 @@ dict <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
     dplyr::filter(!is.na(metabolite))
 
 df <- data.table::fread(here::here("data/ldsc/rg_results_bw_dx_04092025.txt"))  %>%
-    dplyr::mutate(p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_dx/", "", p1),
-                  p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted/", "", p1),
-                  p1 = gsub(".LDSR", "", p1),
-                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted/", "", p2),
-                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_dx/", "", p2),
-                  p2 = gsub(".LDSR", "", p2),
-                  p1 = gsub("CARDIOGRAM_CAD_2022", "CAD", p1), 
-                  p2 = gsub("CARDIOGRAM_CAD_2022", "CAD", p2),
-                  p1 = gsub("GIANT_BMI_2015_EUR", "BMI", p1),
-                  p2 = gsub("GIANT_BMI_2015_EUR", "BMI", p2),
-                  p1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p1),
-                  p2 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p2),
-                  p1 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p1),
-                  p2 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p2),
-                  p1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p1),
-                  p2 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p2),
-                  p1 = gsub("IPDGC_PD_2018", "PD_2018", p1),
-                  p2 = gsub("IPDGC_PD_2018", "PD_2018", p2),
-                  p1 = gsub("IPDGC_PD_2014_lift", "PD_2014", p1), # no UKB overlap
-                  p2 = gsub("IPDGC_PD_2014_lift", "PD_2014", p2),
-                  p1 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p1),
-                  p2 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p2),
-                  p1 = gsub("MEGAVCID_VaD_2024", "VaD", p1),
-                  p2 = gsub("MEGAVCID_VaD_2024", "VaD", p2),
-                  p1 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p1),
-                  p2 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p2),
-                  ) %>%
-    dplyr::filter(p1 != "PGC_AD_2021_v2", p2 != "PGC_AD_2021_v2",
-                  p1 != "EADB_AD_2022", p2 != "EADB_AD_2022",
-                  p1 != "PD_2014", p2 != "PD_2014",
-                  p1 != "PD_2018", p2 != "PD_2018",
-                  p1 != "VaD", p2 != "VaD") %>%
     dplyr::select(p1, p2, rg, se, p) %>% 
     dplyr::mutate(fdr = p.adjust(p, method = "fdr"))
 
 ldsc_metabo_dx <- data.table::fread(here::here("data/ldsc/rg_results_metabo_dx_04092025.txt"))  %>%
-    dplyr::mutate(p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted/", "", p1),
-                  p1 = gsub("/ess/p33/cluster/users/saraes/metabo/ldsc/", "", p1),
-                  p1 = gsub(".LDSR", "", p1),
-                  p1 = gsub(".munge.sumstats", "", p1),
-                  p2 = gsub("/ess/p33/cluster/users/saraes/metabo/ldsc/metabolites/", "", p2),
-                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_metabo/", "", p2),
-                  p2 = gsub(".LDSR", "", p2),
-                  p2 = gsub(".munge.sumstats", "", p2),
-                  p1 = gsub("CARDIOGRAM_CAD_2022", "CAD", p1), 
-                  p2 = gsub("CARDIOGRAM_CAD_2022", "CAD", p2),
-                  p1 = gsub("GIANT_BMI_2015_EUR", "BMI", p1),
-                  p2 = gsub("GIANT_BMI_2015_EUR", "BMI", p2),
-                  p1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p1),
-                  p2 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p2),
-                  p1 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p1),
-                  p2 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p2),
-                  p1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p1),
-                  p2 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p2),
-                  p1 = gsub("IPDGC_PD_2018", "PD_2018", p1),
-                  p2 = gsub("IPDGC_PD_2018", "PD_2018", p2),
-                  p1 = gsub("IPDGC_PD_2014_lift", "PD_2014", p1), # no UKB overlap
-                  p2 = gsub("IPDGC_PD_2014_lift", "PD_2014", p2),
-                  p1 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p1),
-                  p2 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p2),
-                  p1 = gsub("MEGAVCID_VaD_2024", "VaD", p1),
-                  p2 = gsub("MEGAVCID_VaD_2024", "VaD", p2),
-                  p1 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p1),
-                  p2 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p2),
-                  ) %>%
-    dplyr::filter(p1 != "EADB_AD_2022", p2 != "EADB_AD_2022",
-                  p1 != "PD_2014", p2 != "PD_2014",
-                  p1 != "PD_2018", p2 != "PD_2018",
-                  p1 != "VaD", p2 != "VaD") %>%
     dplyr::rename(disorder = p1,
                   metabolite = p2) %>%
     dplyr::select(disorder, metabolite, rg, se, p) %>%
@@ -842,37 +777,6 @@ data.table::fwrite(st5, here::here("data/suppl_tables/st5_ldsc_bw_dx.txt"), sep 
 ```{r ldsc-gcg-dx-barplot}
 
 dx_gcg <- data.table::fread(here::here("data/ldsc/rg_results_GCG_dx_04092025.txt"))  %>%
-    dplyr::mutate(
-                  p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_dx/", "", p1),
-                  p1 = gsub(".LDSR", "", p1),
-                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_GCG/", "", p2),
-                  p2 = gsub(".LDSR", "", p2),
-                  p1 = gsub("CARDIOGRAM_CAD_2022", "CAD", p1), 
-                  p2 = gsub("CARDIOGRAM_CAD_2022", "CAD", p2),
-                  p1 = gsub("GIANT_BMI_2015_EUR", "BMI", p1),
-                  p2 = gsub("GIANT_BMI_2015_EUR", "BMI", p2),
-                  p1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p1),
-                  p2 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p2),
-                  p1 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p1),
-                  p2 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p2),
-                  p1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p1),
-                  p2 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p2),
-                  p1 = gsub("IPDGC_PD_2018", "PD_2018", p1),
-                  p2 = gsub("IPDGC_PD_2018", "PD_2018", p2),
-                  p1 = gsub("IPDGC_PD_2014_lift", "PD_2014", p1), # no UKB overlap
-                  p2 = gsub("IPDGC_PD_2014_lift", "PD_2014", p2),
-                  p1 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p1),
-                  p2 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p2),
-                  p1 = gsub("MEGAVCID_VaD_2024", "VaD", p1),
-                  p2 = gsub("MEGAVCID_VaD_2024", "VaD", p2),
-                  p1 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p1),
-                  p2 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p2)) %>%
-    dplyr::filter(p1 != "EADB_AD_2022", p2 != "EADB_AD_2022",
-                  p1 != "PD_2014", p2 != "PD_2014",
-                  p1 != "PD_2018", p2 != "PD_2018",
-                  p1 != "PGC_AD_2021_v2",
-                  p1 != "VaD", p2 != "VaD",
-                  p2 != "GIP", p2 != "glucagon") %>%
     dplyr::select(p1, p2, rg, se, p) %>% 
     dplyr::mutate(label = round(rg, 2),
                   fdr = p.adjust(p, method = "fdr"))
@@ -923,12 +827,6 @@ trait_order <- c("AD","PD", "Stroke", "CAD", "T2D", "BMI")
 
 mr_gcg_dx <- data.table::fread(here::here("data/mr/MR__exposure_dx_outcome_GCG.csv")) %>% 
     dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method),
-                  outcome = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", outcome),
-                  outcome = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", outcome),
-                  outcome = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", outcome),
-                  outcome = gsub("GIANT_BMI_2015_EUR.STD", "BMI", outcome),
-                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", outcome),
-                  outcome = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", outcome),
                   fdr = p.adjust(pval, method = "fdr")) %>% 
      dplyr::mutate(CI_lower = (b - 1.96 * se),
                   CI_upper = (b + 1.96 * se)) %>% 
@@ -977,12 +875,6 @@ forest.gcg.dx
 
 mr_dx_gcg <- data.table::fread(here::here("data/mr/MR__exposure_GCG_outcome_dx.csv")) %>% 
     dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method),
-                  exposure = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", exposure),
-                  exposure = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", exposure),
-                  exposure = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", exposure),
-                  exposure = gsub("GIANT_BMI_2015_EUR.STD", "BMI", exposure),
-                  exposure = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", exposure),
-                  exposure = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", exposure),
                   fdr = p.adjust(pval, method = "fdr")) %>% 
      dplyr::mutate(CI_lower = (b - 1.96 * se),
                   CI_upper = (b + 1.96 * se)) %>% 
@@ -1070,39 +962,6 @@ ggsave(
 ```{r suppl-table-6}
 
 st6 <- data.table::fread(here::here("data/ldsc/rg_results_GCG_dx_04092025.txt"))  %>%
-    dplyr::mutate(
-                  p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_dx/", "", p1),
-                  p1 = gsub(".LDSR", "", p1),
-                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_GCG/", "", p2),
-                  p2 = gsub(".LDSR", "", p2),
-                  p1 = gsub("CARDIOGRAM_CAD_2022", "CAD", p1), 
-                  p2 = gsub("CARDIOGRAM_CAD_2022", "CAD", p2),
-                  p1 = gsub("GIANT_BMI_2015_EUR", "BMI", p1),
-                  p2 = gsub("GIANT_BMI_2015_EUR", "BMI", p2),
-                  p1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p1),
-                  p2 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p2),
-                  p1 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p1),
-                  p2 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p2),
-                  p1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p1),
-                  p2 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p2),
-                  p1 = gsub("IPDGC_PD_2018", "PD_2018", p1), ## change
-                  p2 = gsub("IPDGC_PD_2018", "PD_2018", p2),
-                  p1 = gsub("IPDGC_PD_2014_lift", "PD_2014", p1),
-                  p2 = gsub("IPDGC_PD_2014_lift", "PD_2014", p2),
-                  p1 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p1),
-                  p2 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p2),
-                  p1 = gsub("MEGAVCID_VaD_2024", "VaD", p1),
-                  p2 = gsub("MEGAVCID_VaD_2024", "VaD", p2),
-                  p1 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p1),
-                  p2 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p2)) %>%
-    dplyr::filter(p1 != "EADB_AD_2022", 
-                  p2 != "EADB_AD_2022",
-                  p1 != "PD_2014", 
-                  p2 != "PD_2014",
-                  p1 != "PD_2018", 
-                  p2 != "PD_2018",
-                  p1 != "VaD", 
-                  p2 != "VaD") %>%
     dplyr::select(p1, p2, rg, se, p) %>% 
     dplyr::mutate(fdr = p.adjust(p, method = "fdr")) %>% 
     dplyr::mutate(p1 = factor(p1, levels = c("BMI", "T2D", "CAD", "Stroke", "PD", "AD"))) %>% 
@@ -1126,7 +985,6 @@ mixer_new <- data.table::fread(here::here("data/mixer/mixer_results.csv"))
 mixer_new2 <- mixer_new %>%
     dplyr::filter(best_vs_min_AIC != "") %>% 
     dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
-                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
                 trait2 = gsub(".STD.noMHC.Z", "", trait2),
                 trait1 = gsub(".STD.noMHC", "", trait1),
                 trait1 = gsub("PGC_AD_2021_noUKB_no23andMe.nochr19", "AD", trait1),
@@ -1152,7 +1010,6 @@ mixer_new2 <- mixer_new %>%
 mixer_glutamine <- data.table::fread(here::here("data/mixer/NORMENT_PD_2023_Braintyphoon_vs_Glutamine.csv")) %>%
     dplyr::filter(best_vs_min_AIC != "") %>% 
     dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
-                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
                 trait2 = gsub(".STD.noMHC.Z", "", trait2),
                 trait1 = gsub(".STD.noMHC", "", trait1),
                 trait1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", trait1),
@@ -1184,17 +1041,9 @@ mixer_gcg <- data.table::fread(here::here("data/mixer/mixer_gcg_results.csv"))
 mixer_gcg2 <- mixer_gcg %>%
     dplyr::filter(best_vs_min_AIC != "") %>% 
   dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
-                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
                 trait2 = gsub(".STD.noMHC.Z", "", trait2),
                 trait2 = gsub(".STD.noMHC", "", trait2),
-                trait1 = gsub(".STD.noMHC", "", trait1),
-                trait1 = gsub("CARDIOGRAM_CAD_2022", "CAD", trait1),
-                trait1 = gsub("GIANT_BMI_2015_EUR", "BMI", trait1),
-                trait1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", trait1),
-                trait1 = gsub("T2DGGI_T2D_2024_EUR.Z", "T2D", trait1),
-                trait1 = gsub("PGC_AD_2021_noUKB_no23andMe.nochr19", "AD", trait1),
-                trait1 = gsub("IPDGC_PD_2018", "PD_2018", trait1),
-                trait1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", trait1),
+                trait1 = gsub(".STD.noMHC", "", trait1)
                 ) %>% 
     dplyr::rename(
         rg_mean = `rg (mean)`,
@@ -1302,17 +1151,17 @@ library(eulerr)
 library(gridExtra)
 
 df_pd <- mixer_glutamine %>%
-  dplyr::filter(sumstatName == "NORMENT_PD_2023_Braintyphoon_vs_Glutamine")
+  dplyr::filter(sumstatName == "PD_vs_Glutamine")
 df_ad <- mixer_new2 %>%
-  dplyr::filter(sumstatName == "PGC_AD_2021_noUKB_no23andMe_nochr19_vs_Glutamine")
+  dplyr::filter(sumstatName == "AD_vs_Glutamine")
 df_bmi <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "GIANT_BMI_2015_EUR_vs_Glutamine")
+  dplyr::filter(sumstatName == "BMI_vs_Glutamine")
 df_t2d <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "T2DGGI_T2D_2024_EUR_vs_Glutamine")
+  dplyr::filter(sumstatName == "T2D_vs_Glutamine")
 df_cad <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "CARDIOGRAM_CAD_2022_vs_Glutamine")
+  dplyr::filter(sumstatName == "CAD_vs_Glutamine")
 df_stroke <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "MEGASTROKE_STROKE_2022_AS_vs_Glutamine")
+  dplyr::filter(sumstatName == "STROKE_vs_Glutamine")
 
 # Helper function to prepare data
 prep_df <- function(df){
@@ -1480,17 +1329,17 @@ combined_grid_glutamine
 ```{r bivariate-mixer-ad}
 
 df_pd <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "NORMENT_PD_2023_Braintyphoon_vs_GCG")
+  dplyr::filter(sumstatName == "PD_vs_GCG")
 df_ad <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "PGC_AD_2021_noUKB_no23andMe_nochr19_vs_GCG")
+  dplyr::filter(sumstatName == "AD_vs_GCG")
 df_bmi <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "GIANT_BMI_2015_EUR_vs_GCG")
+  dplyr::filter(sumstatName == "BMI_vs_GCG")
 df_t2d <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "T2DGGI_T2D_2024_EUR_vs_GCG")
+  dplyr::filter(sumstatName == "T2D_vs_GCG")
 df_cad <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "CARDIOGRAM_CAD_2022_vs_GCG")
+  dplyr::filter(sumstatName == "CAD_vs_GCG")
 df_stroke <- mixer_gcg2 %>%
-  dplyr::filter(sumstatName == "MEGASTROKE_STROKE_2022_AS_vs_GCG")
+  dplyr::filter(sumstatName == "STROKE_vs_GCG")
 
 # Helper function to prepare data
 prep_df <- function(df){
@@ -1702,7 +1551,6 @@ st7 <- mixer_new %>%
     full_join(mixer_pd2014) %>% 
     dplyr::filter(best_vs_min_AIC != "") %>% 
   dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
-                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
                 trait2 = gsub(".STD.noMHC.Z", "", trait2),
                 trait1 = gsub(".STD.noMHC", "", trait1),
                 trait1 = gsub("PGC_AD_2021_noUKB_no23andMe.nochr19", "AD_wochr19", trait1),
@@ -1727,17 +1575,6 @@ data.table::fwrite(st7, here::here("data/suppl_tables/st7_bivarmixer_metabo.txt"
 st8 <- mixer_gcg %>%
     dplyr::filter(best_vs_min_AIC != "") %>% 
   dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
-                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
-                trait2 = gsub(".STD.noMHC.Z", "", trait2),
-                trait2 = gsub(".STD.noMHC", "", trait2),
-                trait1 = gsub(".STD.noMHC", "", trait1),
-                trait1 = gsub("CARDIOGRAM_CAD_2022", "CAD", trait1),
-                trait1 = gsub("GIANT_BMI_2015_EUR", "BMI", trait1),
-                trait1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", trait1),
-                trait1 = gsub("T2DGGI_T2D_2024_EUR.Z", "T2D", trait1),
-                trait1 = gsub("PGC_AD_2021_noUKB_no23andMe.nochr19", "AD_wochr19", trait1),
-                trait1 = gsub("IPDGC_PD_2018", "PD_2018", trait1),
-                trait1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", trait1),
                 trait1 = factor(trait1, levels = c("BMI", "T2D", "CAD", "Stroke", "PD", "AD_wochr19"))
                 ) %>% 
     dplyr::select(-fname, -sumstatName, -best_vs_min_BIC, -best_vs_max_BIC, -`pi1 (mean)`, -`pi1 (std)`, -`pi2 (mean)`, -`pi2 (std)`, -`pi12 (mean)`, -`pi12 (std)`, -`dice (mean)`, -`dice (std)`, -`rho_zero (mean)`, -`rho_zero (std)`, -`rho_beta (mean)`, -`rho_beta (std)`) %>% 
@@ -1954,15 +1791,7 @@ mr_df <- data.table::fread(here::here("data/mr/MR__exposure_metabolite_outcome_s
 mr_cmd <- mr_df %>% 
     dplyr::filter(outcome != "EADB_AD_2022_metadata.STD" & outcome != "MEGAVCID_VaD_2024.STD"  & outcome !="IPDGC_PD_2014_lift.STD"
                   ) %>% 
-    dplyr::mutate(outcome = gsub("GIANT_BMI_2015_EUR.STD", "BMI", outcome),
-                  outcome = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", outcome),
-                  outcome = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", outcome),
-                  outcome = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", outcome),
-                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", outcome),
-                  outcome = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", outcome), ## change
-                  outcome = gsub("IPDGC_PD_2018.STD", "PD_2018", outcome), ## change
-                  outcome = gsub("IPDGC_PD_2018.STD", "PD_2014", outcome), ## change
-                  fdr = p.adjust(pval, method = "fdr")) %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>%
     dplyr::left_join(dict) %>% 
     dplyr::rename(metabolite = prettyName,
                   disorder = outcome)
@@ -2324,16 +2153,7 @@ trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
 
 mr_metabo_dx <- data.table::fread(here::here("data/mr/MR__exposure_metabolite_outcome_smd.csv")) %>% 
     dplyr::left_join(dict_mr) %>% 
-    dplyr::filter(outcome != "EADB_AD_2022_metadata.STD" & outcome != "MEGAVCID_VaD_2024.STD") %>% 
     dplyr::mutate(outcome = gsub(".STD", "", outcome),
-                  outcome = gsub("GIANT_BMI_2015_EUR", "BMI", outcome),
-                  outcome = gsub("T2DGGI_T2D_2024_EUR", "T2D", outcome),
-                  outcome = gsub("CARDIOGRAM_CAD_2022", "CAD", outcome), 
-                  outcome = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", outcome),
-                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", outcome),
-                  outcome = gsub("IPDGC_PD_2014_lift", "PD_2014", outcome),
-                  outcome = gsub("IPDGC_PD_2018", "PD_2018", outcome),
-                  outcome = gsub("NORMENT_PD_2023_Braintyphoon", "PD", outcome), 
                   method = gsub("Inverse variance weighted", "IVW", method)
                   ) %>% 
     dplyr::filter(outcome != "PD_2014" & outcome != "PD_2018") %>% 
@@ -2355,14 +2175,6 @@ mr_dx_metabo <- data.table::fread(here::here("data/mr/MR__exposure_smd_outcome_m
     dplyr::left_join(dict_mr) %>% 
     dplyr::filter(exposure != "EADB_AD_2022_metadata.STD" & exposure != "MEGAVCID_VaD_2024.STD") %>% 
     dplyr::mutate(exposure = gsub(".STD", "", exposure),
-                  exposure = gsub("GIANT_BMI_2015_EUR", "BMI", exposure),
-                  exposure = gsub("T2DGGI_T2D_2024_EUR", "T2D", exposure),
-                  exposure = gsub("CARDIOGRAM_CAD_2022", "CAD", exposure), 
-                  exposure = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", exposure),
-                  exposure = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", exposure),
-                  exposure = gsub("IPDGC_PD_2014_lift", "PD_2014", exposure),
-                  exposure = gsub("IPDGC_PD_2018", "PD_2018", exposure),
-                  exposure = gsub("NORMENT_PD_2023_Braintyphoon", "PD", exposure),
                   method = gsub("Inverse variance weighted", "IVW", method)
                   ) %>% 
     dplyr::filter(exposure != "PD_2014" & exposure != "PD_2018") %>% 
@@ -2388,14 +2200,6 @@ GCG <--> Dx
 trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
 mr_gcg_dx <- data.table::fread(here::here("data/mr/MR__exposure_dx_outcome_GCG.csv")) %>% 
     dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method),
-                  outcome = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", outcome),
-                  outcome = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", outcome),
-                  outcome = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", outcome),
-                  outcome = gsub("GIANT_BMI_2015_EUR.STD", "BMI", outcome),
-                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", outcome),
-                  outcome = gsub("IPDGC_PD_2014_lift.STD", "PD_2014", outcome),
-                  outcome = gsub("IPDGC_PD_2018.STD", "PD_2018", outcome), 
-                  outcome = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", outcome), 
                   fdr = p.adjust(pval, method = "fdr")) %>% 
      dplyr::mutate(CI_lower = (b - 1.96 * se),
                   CI_upper = (b + 1.96 * se)) %>% 
@@ -2408,14 +2212,6 @@ mr_gcg_dx <- mr_gcg_dx %>% dplyr::arrange(outcome, exposure)
 
 mr_dx_gcg <- data.table::fread(here::here("data/mr/MR__exposure_GCG_outcome_dx.csv")) %>%
     dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method),
-                  exposure = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", exposure),
-                  exposure = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", exposure),
-                  exposure = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", exposure),
-                  exposure = gsub("GIANT_BMI_2015_EUR.STD", "BMI", exposure),
-                  exposure = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", exposure),
-                  exposure = gsub("IPDGC_PD_2014_lift.STD", "PD_2014", exposure),
-                  exposure = gsub("IPDGC_PD_2018.STD", "PD_2018", exposure), 
-                  exposure = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", exposure), 
                   fdr = p.adjust(pval, method = "fdr")) %>% 
      dplyr::mutate(CI_lower = (b - 1.96 * se),
                   CI_upper = (b + 1.96 * se)) %>% 
@@ -2439,26 +2235,8 @@ trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
 
 st11 <- data.table::fread(here::here("data/mr/MR__exposure_dx_outcome_trait.csv")) %>%
     dplyr::mutate(exposure = gsub(".STD", "", exposure),
-                  exposure = gsub("GIANT_BMI_2015_EUR", "BMI", exposure),
-                  exposure = gsub("T2DGGI_T2D_2024_EUR", "T2D", exposure),
-                  exposure = gsub("CARDIOGRAM_CAD_2022", "CAD", exposure), 
-                  exposure = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", exposure),
-                  exposure = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", exposure),
-                  exposure = gsub("IPDGC_PD_2014_lift", "PD_2014", exposure),
-                  exposure = gsub("IPDGC_PD_2018", "PD_2018", exposure),
-                  exposure = gsub("NORMENT_PD_2023_Braintyphoon", "PD", exposure),
-                  outcome = gsub("GIANT_BMI_2015_EUR", "BMI", outcome),
-                  outcome = gsub("T2DGGI_T2D_2024_EUR", "T2D", outcome),
-                  outcome = gsub("CARDIOGRAM_CAD_2022", "CAD", outcome), 
-                  outcome = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", outcome),
-                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", outcome),
-                  outcome = gsub("IPDGC_PD_2014_lift", "PD_2014", outcome),
-                  outcome = gsub("IPDGC_PD_2018", "PD_2018", outcome),
-                  outcome = gsub("NORMENT_PD_2023_Braintyphoon", "PD", outcome),
                   method = gsub("Inverse variance weighted", "IVW", method)
                   ) %>%
-    dplyr::filter(exposure != "PD_2014" & outcome != "PD_2014",
-                  exposure != "PD_2018" & outcome != "PD_2018") %>%
     dplyr::filter(!(exposure == "BMI" & outcome == "BMI"),
            !(exposure == "T2D" & outcome == "T2D"),
            !(exposure == "CAD" & outcome == "CAD"),
