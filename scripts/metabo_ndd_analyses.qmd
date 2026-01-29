@@ -1,0 +1,3705 @@
+---
+title: "metabo ~ ndd analyses"
+author: "Sara Stinson"
+format: html
+editor: source
+---
+
+```{r setup, include=FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(data.table)
+library(tidymodels)
+```
+
+## Pheno assoc
+
+```{r load-pheno}
+
+dict <- data.table::fread(here::here("data-raw/metaboDict_250331.txt"), sep ="\t") %>% 
+    dplyr::rename(sumstatsName = metabolite)
+
+pheno <- data.table::fread(here::here("data/pheno_assoc_metabo_results.txt"))  %>% 
+    left_join(dict) %>% 
+        dplyr::mutate(group = gsub("Glycolysis related metabolites", "Glycolysis", group),
+                      group = gsub("Relative lipoprotein lipid concentrations", "Rel lipoprotein lipid conc", group),
+                      group = gsub("Lipoprotein particle concentrations", "Lipoprotein particle conc", group))
+
+```
+
+### Volcano
+
+```{r pheno-vol}
+
+pheno2 <- pheno %>% 
+    dplyr::rename(disorder = outcome)
+
+pheno_ad <- pheno2 %>%
+    dplyr::filter(disorder == "AD") %>%
+    dplyr::mutate(
+        neg_log_fdr = -log10(fdr),
+        neg_log_p = -log10(p.value),
+        label = ifelse(fdr < 0.05, prettyName, NA),
+        group = ifelse(fdr < 0.05, group, NA),
+        size = ifelse(fdr < 0.05, 1, 2),
+    )
+
+vol_ad_pheno <- pheno_ad %>%
+    ggplot(aes(x = beta, y = neg_log_fdr, size = size)) +
+    geom_point(data = dplyr::filter(pheno_ad, is.na(group)), color = "grey", show.legend = FALSE) +  
+    geom_point(data = dplyr::filter(pheno_ad, !is.na(group)), aes(color = group)) +  
+    ggrepel::geom_text_repel(aes(label = label), size = 5.5, color = "black", max.overlaps = 18) +
+    labs(x = "Log(Odds Ratio)",
+         y = "-Log10(FDR)",
+         color = "Metabolite category") +
+    theme_minimal() +
+    scale_color_manual(values = setNames(pheno_ad$newColor, pheno_ad$group), drop = FALSE) +
+    scale_y_continuous(limits = c(0, 6)) +
+    scale_size_continuous(range = c(2.5, 1), guide = "none") +  
+    scale_x_continuous(limits = c(-0.2, 0.2), breaks = c(-0.2, -0.1, 0, 0.1, 0.2)) +
+    guides(color = guide_legend(override.aes = list(size = 3))) +  
+    theme(axis.text = element_text(color = "black", size = 20),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+          legend.title = element_text(color = "black", size = 20),
+          legend.text = element_text(color = "black", size = 20),
+          strip.text = element_text(color = "black", size = 20, face = "bold"),
+          panel.grid = element_blank(),
+          axis.line.x = element_line(color = "black"),
+          axis.line.y = element_line(color = "black"),
+          strip.background = element_rect(fill = "white", color = "white")
+    ) +
+    facet_wrap(~disorder, nrow = 2, ncol = 1)
+
+pheno_pd <- pheno2 %>%
+    dplyr::filter(disorder == "PD") %>%
+    dplyr::mutate(
+        neg_log_fdr = -log10(fdr),
+        neg_log_p = -log10(p.value),
+        label = ifelse(fdr < 0.05, prettyName, NA),
+        group = ifelse(fdr < 0.05, group, NA),
+        size = ifelse(fdr < 0.05, 1, 2),
+    )
+
+vol_pd_pheno <- pheno_pd %>%
+    ggplot(aes(x = beta, y = neg_log_fdr, size = size)) +
+    geom_point(data = dplyr::filter(pheno_pd, is.na(group)), color = "grey", show.legend = FALSE) +  
+    geom_point(data = dplyr::filter(pheno_pd, !is.na(group)), aes(color = group)) +  
+    ggrepel::geom_text_repel(aes(label = label), size = 5.5, color = "black", max.overlaps = 18) +
+    labs(x = "Log(Odds Ratio)",
+         y = "-Log10(FDR)",
+         color = "Metabolite category") +
+    theme_minimal() +
+    scale_color_manual(values = setNames(pheno_pd$newColor, pheno_pd$group), drop = FALSE) +
+    scale_y_continuous(limits = c(0, 15)) +
+    scale_size_continuous(range = c(2.5, 1), guide = "none") +  
+    scale_x_continuous(limits = c(-0.2, 0.2), breaks = c(-0.2, -0.1, 0, 0.1, 0.2)) +
+    guides(color = guide_legend(override.aes = list(size = 3))) +  
+    theme(axis.text = element_text(color = "black", size = 20),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 1, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+          legend.title = element_text(color = "black", size = 20),
+          legend.text = element_text(color = "black", size = 20),
+          strip.text = element_text(color = "black", size = 20, face = "bold"),
+          panel.grid = element_blank(),
+          axis.line.x = element_line(color = "black"),
+          axis.line.y = element_line(color = "black"),
+          strip.background = element_rect(fill = "white", color = "white")
+    ) +
+    facet_wrap(~disorder, nrow = 2, ncol = 1)
+vol_pd_pheno
+
+combined_pheno_vol <- ggpubr::ggarrange(
+    vol_ad_pheno,
+    vol_pd_pheno,
+    ncol = 1,
+    nrow = 2,
+    common.legend = TRUE,
+    legend = "none"
+)
+combined_pheno_vol
+
+```
+
+### Corr mat
+
+```{r phenp-assoc-corr-mat}
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+
+pheno_wide <- pheno %>%
+    select(outcome, metabolite, beta) %>%
+    pivot_wider(names_from = outcome, values_from = beta) %>%
+    dplyr::select(metabolite, BMI, T2D, CAD, Stroke, PD, AD)
+
+spearman_results <- cor(pheno_wide[,-1], method = "spearman", use = "pairwise.complete.obs")
+spearman_results[lower.tri(spearman_results)] <- NA
+spearman_results
+
+df_combined <- reshape2::melt(spearman_results, na.rm = TRUE)
+
+df_combined$label <- ifelse(df_combined$Var1 == df_combined$Var2, "", round(df_combined$value, 2))
+
+cormat_pheno <- df_combined %>%
+    ggplot(aes(Var1, Var2)) +
+    geom_tile(aes(fill = value), color = "white") +
+    geom_text(aes(label = label), size = 5.5) +  
+    scale_fill_gradient2(low = "blue", high = "orange", mid = "white", midpoint = 0, limit = c(-1, 1), breaks = c(-1, -0.5, 0, 0.5, 1), labels = c("-1.0", "-0.5", "0.0", "0.5", "1.0"), name="rs") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(color = "black", size = 20),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+          axis.text.y = element_text(color = "black", size = 20),
+          legend.text = element_text(color = "black", size = 20),
+          panel.grid = element_blank(),
+          legend.position = "right",
+          legend.title = element_text(color = "black", size = 20),
+          axis.line.x = element_line(color = "black"),
+          axis.line.y = element_line(color = "black"),
+          legend.key.size = unit(1, "cm"),
+          plot.background = element_rect(fill = "white", color = "white"),  # Set plot background to white
+          panel.background = element_rect(fill = "white", color = "white")
+    ) +
+    guides(fill = guide_colorbar(title.position = "top", title.hjust = 0)) + # Set the title above the legend
+    labs(x = " ", y = "Spearman correlation (rs)") +
+    coord_fixed()
+cormat_pheno
+
+```
+
+### Heatmap
+
+```{r pheno-assoc-heatmap}
+
+pheno_heatmap <- pheno %>% 
+    dplyr::select(outcome, metabolite, beta) %>%
+    reshape2::dcast(metabolite ~ outcome, value.var = "beta")
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+metabolite_order <- hclust(dist(pheno_heatmap[,-1]), method = "complete")$order
+pheno$metabolite <- factor(pheno$metabolite, levels = pheno_heatmap$metabolite[metabolite_order])
+pheno$outcome <- factor(pheno$outcome, levels = trait_order)
+
+heatmap_pheno_plot <- ggplot(pheno, aes(x = outcome, y = metabolite, fill = beta)) +
+    geom_tile() +
+    scale_fill_gradient2(low = "blue", high = "orange", mid = "white", midpoint = 0, 
+                         limit = c(-1.1, 1.0), breaks = c(-1.0, -0.5, 0, 0.5, 1.0), labels = c("-1.0", "-0.5", "0.0", "0.5", "1.0"), 
+                         name = "β") +
+    theme_minimal() +
+  theme(axis.text.x = element_text(color = "black", size = 20),
+        legend.text = element_text(color = "black", size = 20),
+        legend.title = element_text(color = "black", size = 20),
+        panel.background = element_rect(colour = 'white', fill = 'white'),
+        legend.background = element_rect(colour = 'white', fill = 'white'),
+        plot.background = element_rect(colour = 'white', fill = 'white'),
+        axis.text.y = element_blank(),
+        panel.grid = element_blank(),
+        axis.line.x = element_line(color = "black"),
+        axis.line.y = element_line(color = "black"),
+        legend.key.size = unit(0.7, "cm"),
+        legend.spacing = unit(1, "cm"),
+        legend.position = "right",
+        plot.margin = margin(5, 40, 5, 20),
+        axis.title = element_blank()) +
+  ggnewscale::new_scale_fill() +
+    scale_fill_manual(values = setNames(pheno$newColor,  pheno$group)) +
+  geom_tile(pheno, stat = "identity", inherit.aes = F,
+            mapping = aes(y = metabolite, 
+                          x = 6.7, 
+                          fill = group, width = .4)
+            ) +
+  guides(fill = guide_legend(title = "Metabolite category", ncol = 1))
+heatmap_pheno_plot
+
+```
+
+### Suppl Fig1
+
+```{r}
+
+combined_vol_cormat <- ggpubr::ggarrange(combined_pheno_vol, 
+                                  cormat_pheno, 
+                                  ncol=1, 
+                                  nrow=2,
+                                  labels = c("a", "b"),
+                                  heights = c(1.8, 1),
+                                  widths = c(1, 3),
+                                  font.label = list(size = 20, color = "black", face = "bold")
+                                  )
+combined_vol_cormat
+
+combined_pheno_plot <- ggpubr::ggarrange(
+    combined_vol_cormat,
+    heatmap_pheno_plot,
+    ncol = 2,
+    nrow = 1,
+    widths = c(1.2, 2),
+    labels = c("", "c"),
+    font.label = list(size = 20, color = "black", face = "bold")
+)
+combined_pheno_plot
+
+ggsave(
+    here::here("img/suppl_figs/SupplFig1_pheno_assoc.tiff"),
+    plot = combined_pheno_plot,
+    width = 52, height = 42, 
+    units = "cm", 
+    device = 'tiff',
+    dpi = 400,
+    bg = "white"
+)
+
+```
+
+### ST3
+
+```{r suppl-table-3}
+
+st3 <- pheno %>% 
+    dplyr::mutate(fdr = p.adjust(p.value, method = "fdr")) %>% 
+    dplyr::rename(p = p.value) %>% 
+    dplyr::select(outcome, prettyName, beta, se, p, fdr) %>%
+  pivot_wider(
+    names_from = outcome,
+    values_from = c(beta, se, p, fdr)) %>% 
+    dplyr::rename(metabolite = prettyName) %>% 
+    dplyr::select(metabolite, beta_BMI, se_BMI, p_BMI, fdr_BMI,
+                  beta_T2D, se_T2D, p_T2D, fdr_T2D, 
+                  beta_CAD, se_CAD, p_CAD, fdr_CAD, 
+                  beta_Stroke, se_Stroke, p_Stroke, fdr_Stroke, 
+                  beta_PD, se_PD, p_PD, fdr_PD,
+                  beta_AD, se_AD, p_AD, fdr_AD) %>% 
+    arrange(metabolite)
+
+data.table::fwrite(st3, here::here("data/suppl_tables/st3_pheno_assoc.txt"), sep = "\t")
+
+```
+
+## GCG GWAS
+
+### Suppl Fig2
+
+```{r manhattan-plot-gcg}
+
+gcg_df <- data.table::fread(here::here("data/manhattan/GCG.STD"))
+
+df <- gcg_df %>%
+    dplyr::rename(
+        CHROM = CHR,
+        P = PVAL,
+        POS = BP)
+
+data_cum <- df %>%
+    mutate(chr = as.numeric(CHROM),
+           bp = as.numeric(POS)) %>%
+    group_by(chr) %>%
+    summarise(max_bp = max(bp)) %>%
+    mutate(bp_add = lag(cumsum(max_bp), default = 0)) %>%
+    select(chr, bp_add)
+
+gwas_data <- df %>%
+    mutate(chr = as.numeric(CHROM),
+           bp = as.numeric(POS)) %>%
+    inner_join(data_cum, by = "chr") %>%
+    mutate(bp_cum = bp + bp_add)
+
+axis_set <- gwas_data %>%
+    group_by(chr) %>%
+    summarize(center = mean(bp_cum))
+
+ylim <- gwas_data %>%
+    rename(p = P) %>%
+    filter(p == min(p)) %>%
+    mutate(ylim = abs(floor(log10(p))) + 2) %>%
+    pull(ylim)
+
+sig <- 1.7e-11
+
+manhplot <- gwas_data %>%
+    mutate(label = case_when(SNP == "rs17145750" ~ "MLXIPL", #chr7 
+                             SNP == "rs39281" ~ "STEAP2-AS1", #chr7 
+                             SNP == "rs964184" ~ "BUD13-DT", #chr11
+                             SNP == "rs72654473" ~ "APOC1", #chr19
+                             SNP == "rs1260326" ~ "GCKR", #chr2
+                             #SNP == "rs13234131" ~ "MLXIPL", #chr7
+                             #SNP == "rs10953006" ~ "CLDN12", # chr7
+                             #SNP == "rs782819119" ~ "ABO", #chr9
+                             SNP == "rs964184" ~ "BUD13-DT", #chr11
+                             SNP == "rs7412" ~ "APOE" #chr19
+                             )) %>%
+    rename(p = P) %>%
+    ggplot(aes(x = bp_cum, y = -log10(p), color = as.factor(chr))) +
+    #geom_hline(yintercept = -log10(sig), color = "grey25", linetype = "dashed", lwd = 0.5) +
+    geom_point(size = 1.75) +
+    scale_x_continuous(expand = c(.01,.01), label = axis_set$chr, breaks = axis_set$center) +
+    scale_y_continuous(expand = c(.02,.02), limits = c(0, 20), breaks = c(0,5,10,15,20)) + # may need to increase the y-axis limits
+    scale_color_manual(
+        values = rep(c("#E69F00", "#F5D899"),
+                     unique(length(axis_set$chr)))) +
+    labs(x = "Chromosome",
+         y = expression(paste('-log'[10],'(', italic('p'),')'))) +
+    #annotate("text", x = 0.25, y = 7.75, hjust = 0, label = "1.7e-11", color = "black", size = 7) +
+    geom_text(aes(label = label), color = "grey25", angle = 90, hjust = -0.125) + # check this
+    theme_minimal() +
+    theme(
+        panel.background = element_rect(fill = "transparent", colour = NA),
+        plot.background = element_rect(fill = "transparent", colour = NA),
+        legend.background = element_rect(fill = "transparent", colour = NA),
+        legend.key = element_rect(fill = "transparent", colour = NA),
+        panel.grid = element_blank(),
+        axis.line.x = element_line(color = "black", size = 0.6),
+        axis.line.y = element_line(color = "black", size = 0.6),  # Ensure y-axis is also visible
+        legend.position = "none",
+        axis.text = element_text(size = 20, colour = "black"),
+        axis.title.x = element_text(size = 20,  colour = "black",  margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 20,  colour = "black",  margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.text.x = element_text(colour = "black", size = 20, face = "bold"),
+        strip.text.y = element_text(colour = "black", size = 20, face = "bold"),
+        strip.background.x = element_rect(colour = "transparent", fill = "transparent"),
+        strip.background.y = element_rect(colour = "transparent", fill = "transparent"),
+        strip.placement.y = "bottom"
+    )
+
+## qq-plot
+p <- df$P[!is.na(df$P)]
+n <- length(p)
+x2obs <- qchisq(p,1,lower.tail=FALSE)
+x2exp <- qchisq(1:n/n,1,lower.tail=FALSE)
+lambda <- round(median(x2obs)/median(x2exp), 3)
+
+qqplot <- topr::qqtopr(df) +
+    theme_bw() +
+    annotate("text", x = 0.9, y = 15, label = paste("λ = ", lambda), size = 7) +
+    labs(y = expression(Observed -log[10](italic(p))),
+         x = expression(Expected -log[10](italic(p)))) +
+    geom_point(size = 1.75, color = "#E69F00") +  # change dot color
+    scale_y_continuous(expand = c(.0,.0), limits = c(0,16), breaks = c(0,5,10,15)) + # may need to increase the y-axis limits
+    scale_x_continuous(expand = c(.0,.0), limits = c(0,7), breaks = c(0,1,2,3,4,5,6,7)) +
+    theme_minimal() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_text(size = 20, colour = "black"),
+          axis.line.x = element_line(color = "black", size = 0.6),
+          axis.line.y = element_line(color = "black", size = 0.6),  # Ensure y-axis is also visible
+          axis.title.x = element_text(size = 20,  colour = "black",  margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 20,  colour = "black",  margin = margin(t = 0, r = 15, b = 0, l = 0))) +
+    theme(aspect.ratio = 1)
+
+library(cowplot)
+
+manh_qqplot <- plot_grid(manhplot, qqplot,
+          labels = c("a", "b"),
+          label_fontface = "bold",
+          label_size = 20,   
+          ncol = 2,
+          rel_widths = c(2, 1))
+
+ggplot2::ggsave(
+    filename = "SupplFig2_manhattan_qq-plot_GCG.png",
+    plot = manh_qqplot,
+    path = here::here("img/suppl_figs"),
+    width = 30,
+    height = 8, 
+    device = "png",
+    dpi = 400,
+    type = "cairo",
+    bg = "white"
+)
+
+```
+
+## LDSC
+
+```{r load-ldsc-data}
+
+randomized_colors <- c(
+    "#A6CEE3",
+    "#1F78B4",
+    "#B2DF8A",
+    "#33A02C",
+    "#66A61E",
+    "#1B9E77",
+    "#8DA0CB",
+    "#E78AC3",
+    "#FB9A99",
+    "#E7298A",
+    "#E31A1C",
+    "#FDBF6F",
+    "#E6AB02",
+    "#FF7F00",
+    "#CAB2D6",
+    "#6A3D9A",
+    "#FFFF99",
+    "#B15928",
+    "#666666"
+)
+
+dict <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(metabolite = sumstatName) %>%
+    dplyr::select(metabolite, prettyName, group, subgroup, groupColor) %>% 
+    dplyr::mutate(newColor = randomized_colors[match(group, unique(group))]) %>% 
+    dplyr::filter(!is.na(metabolite))
+
+df <- data.table::fread(here::here("data/ldsc/rg_results_bw_dx_04092025.txt"))  %>%
+    dplyr::mutate(p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_dx/", "", p1),
+                  p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted/", "", p1),
+                  p1 = gsub(".LDSR", "", p1),
+                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted/", "", p2),
+                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_dx/", "", p2),
+                  p2 = gsub(".LDSR", "", p2),
+                  p1 = gsub("CARDIOGRAM_CAD_2022", "CAD", p1), 
+                  p2 = gsub("CARDIOGRAM_CAD_2022", "CAD", p2),
+                  p1 = gsub("GIANT_BMI_2015_EUR", "BMI", p1),
+                  p2 = gsub("GIANT_BMI_2015_EUR", "BMI", p2),
+                  p1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p1),
+                  p2 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p2),
+                  p1 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p1),
+                  p2 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p2),
+                  p1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p1),
+                  p2 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p2),
+                  p1 = gsub("IPDGC_PD_2018", "PD_2018", p1),
+                  p2 = gsub("IPDGC_PD_2018", "PD_2018", p2),
+                  p1 = gsub("IPDGC_PD_2014_lift", "PD_2014", p1), # no UKB overlap
+                  p2 = gsub("IPDGC_PD_2014_lift", "PD_2014", p2),
+                  p1 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p1),
+                  p2 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p2),
+                  p1 = gsub("MEGAVCID_VaD_2024", "VaD", p1),
+                  p2 = gsub("MEGAVCID_VaD_2024", "VaD", p2),
+                  p1 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p1),
+                  p2 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p2),
+                  ) %>%
+    dplyr::filter(p1 != "PGC_AD_2021_v2", p2 != "PGC_AD_2021_v2",
+                  p1 != "EADB_AD_2022", p2 != "EADB_AD_2022",
+                  p1 != "PD_2014", p2 != "PD_2014",
+                  p1 != "PD_2018", p2 != "PD_2018",
+                  p1 != "VaD", p2 != "VaD") %>%
+    dplyr::select(p1, p2, rg, se, p) %>% 
+    dplyr::mutate(fdr = p.adjust(p, method = "fdr"))
+
+ldsc_metabo_dx <- data.table::fread(here::here("data/ldsc/rg_results_metabo_dx_04092025.txt"))  %>%
+    dplyr::mutate(p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted/", "", p1),
+                  p1 = gsub("/ess/p33/cluster/users/saraes/metabo/ldsc/", "", p1),
+                  p1 = gsub(".LDSR", "", p1),
+                  p1 = gsub(".munge.sumstats", "", p1),
+                  p2 = gsub("/ess/p33/cluster/users/saraes/metabo/ldsc/metabolites/", "", p2),
+                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_metabo/", "", p2),
+                  p2 = gsub(".LDSR", "", p2),
+                  p2 = gsub(".munge.sumstats", "", p2),
+                  p1 = gsub("CARDIOGRAM_CAD_2022", "CAD", p1), 
+                  p2 = gsub("CARDIOGRAM_CAD_2022", "CAD", p2),
+                  p1 = gsub("GIANT_BMI_2015_EUR", "BMI", p1),
+                  p2 = gsub("GIANT_BMI_2015_EUR", "BMI", p2),
+                  p1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p1),
+                  p2 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p2),
+                  p1 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p1),
+                  p2 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p2),
+                  p1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p1),
+                  p2 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p2),
+                  p1 = gsub("IPDGC_PD_2018", "PD_2018", p1),
+                  p2 = gsub("IPDGC_PD_2018", "PD_2018", p2),
+                  p1 = gsub("IPDGC_PD_2014_lift", "PD_2014", p1), # no UKB overlap
+                  p2 = gsub("IPDGC_PD_2014_lift", "PD_2014", p2),
+                  p1 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p1),
+                  p2 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p2),
+                  p1 = gsub("MEGAVCID_VaD_2024", "VaD", p1),
+                  p2 = gsub("MEGAVCID_VaD_2024", "VaD", p2),
+                  p1 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p1),
+                  p2 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p2),
+                  ) %>%
+    dplyr::filter(p1 != "EADB_AD_2022", p2 != "EADB_AD_2022",
+                  p1 != "PD_2014", p2 != "PD_2014",
+                  p1 != "PD_2018", p2 != "PD_2018",
+                  p1 != "VaD", p2 != "VaD") %>%
+    dplyr::rename(disorder = p1,
+                  metabolite = p2) %>%
+    dplyr::select(disorder, metabolite, rg, se, p) %>%
+    dplyr::left_join(dict) %>% 
+        dplyr::mutate(group = gsub("Glycolysis related metabolites", "Glycolysis", group),
+                      group = gsub("Relative lipoprotein lipid concentrations", "Rel lipoprotein lipid conc", group),
+                      group = gsub("Lipoprotein particle concentrations", "Lipoprotein particle conc", group),
+        )
+table(ldsc_metabo_dx$disorder)
+
+```
+
+### Volcano
+
+```{r ldsc-vol}
+
+rg_ad <- ldsc_metabo_dx %>%
+    dplyr::filter(disorder == "AD") %>%
+    dplyr::mutate(
+        fdr = p.adjust(p, method = "fdr"),
+        neg_log_fdr = -log10(fdr),
+        neg_log_p = -log10(p),
+        label = ifelse(p < 0.05, prettyName, NA),
+        group = ifelse(p < 0.05, group, NA),
+        size = ifelse(p < 0.05, 1, 2),
+    )
+
+rg_ad_sig <- ldsc_metabo_dx %>%
+    dplyr::filter(disorder == "AD") %>%
+    dplyr::filter(p < 0.05)
+
+vol_ad_plot <- rg_ad %>%
+    ggplot(aes(x = rg, y = neg_log_p, size = size)) +
+    geom_point(data = dplyr::filter(rg_ad, is.na(group)), color = "grey", show.legend = FALSE) +  
+    geom_point(data = dplyr::filter(rg_ad, !is.na(group)), aes(color = group)) +  
+    ggrepel::geom_text_repel(aes(label = label), size = 5.5, color = "black", max.overlaps = 10) +
+    labs(x = "Genetic correlation (rg)",
+         y = "-Log10(P)",
+         color = "Metabolite category") +
+    theme_minimal() +
+    scale_color_manual(values = setNames(rg_ad$newColor,  rg_ad$group)) + 
+    scale_y_continuous(limits = c(0, 4.2)) +
+    scale_size_continuous(range = c(2.5, 1), guide = "none") +  # Adjust size range to control point size
+    scale_x_continuous(limits = c(-0.3, 0.3), breaks = c(-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3)) +
+    theme(axis.text = element_text(color = "black", size = 20),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+          legend.title = element_text(color = "black", size = 20, face = "bold"),
+          legend.text = element_text(color = "black", size = 20),
+          strip.text = element_text(color = "black", size = 20, face = "bold"),
+          panel.grid = element_blank(),
+          strip.background = element_rect(fill = "white", color = "white"),
+          axis.line.x = element_line(color = "black"),
+          axis.line.y = element_line(color = "black")
+    ) +
+    facet_wrap(~disorder, nrow = 2, ncol = 1)
+vol_ad_plot
+
+rg_pd <- ldsc_metabo_dx %>%
+    dplyr::filter(disorder == "PD") %>%
+    dplyr::mutate(
+        fdr = p.adjust(p, method = "fdr"),
+        neg_log_fdr = -log10(fdr),
+        neg_log_p = -log10(p),
+        label = ifelse(p < 0.05, prettyName, NA),
+        group = ifelse(p < 0.05, group, NA),
+        size = ifelse(p < 0.05, 1, 2),
+    )
+
+rg_pd_sig <- ldsc_metabo_dx %>%
+    dplyr::filter(disorder == "PD") %>%
+    dplyr::filter(p < 0.05)
+
+vol_pd_plot <- rg_pd %>%
+    ggplot(aes(x = rg, y = neg_log_p, size = size)) +
+    geom_point(data = dplyr::filter(rg_pd, is.na(group)), color = "grey", show.legend = FALSE) +  
+    geom_point(data = dplyr::filter(rg_pd, !is.na(group)), aes(color = group)) + 
+    ggrepel::geom_text_repel(aes(label = label), size = 5.5, color = "black", max.overlaps = 10) +
+    labs(x = "Genetic correlation (rg)",
+         y = "-Log10(P)",
+         color = "Metabolite category") +
+    theme_minimal() +
+    scale_y_continuous(limits = c(0, 4.2)) +
+    scale_color_manual(values = setNames(rg_pd$newColor,  rg_pd$group)) + 
+    scale_size_continuous(range = c(2.5, 1), guide = "none") +  # Adjust size range to control point size
+    scale_x_continuous(limits = c(-0.3, 0.3), breaks = c(-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3)) +
+    theme(axis.text = element_text(color = "black", size = 20),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+          legend.title = element_text(color = "black", size = 20, face = "bold"),
+          legend.text = element_text(color = "black", size = 20),
+          strip.text = element_text(color = "black", size = 20, fac = "bold"),
+          panel.grid = element_blank(),
+          strip.background = element_rect(fill = "white", color = "white"),
+          axis.line.x = element_line(color = "black"),
+          axis.line.y = element_line(color = "black"),
+    ) +
+    facet_wrap(~disorder, nrow = 2, ncol = 1)
+vol_pd_plot
+
+combined_vol <- ggpubr::ggarrange(vol_ad_plot, 
+                                  vol_pd_plot, 
+                                  ncol=1, nrow=2, 
+                                  legend="none")
+combined_vol
+
+```
+
+### Corr mat
+
+```{r ldsc-corr-mat}
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD" )
+
+rg_matrix <- matrix(NA, nrow=length(trait_order), ncol=length(trait_order),
+                    dimnames = list(trait_order, trait_order)) 
+
+for (i in 1:nrow(df)) {
+    rg_matrix[df$p1[i], df$p2[i]] <- pmin(df$rg[i], 1.0) 
+}
+
+diag(rg_matrix) <- 1  
+
+df_heatmap <- reshape2::melt(rg_matrix, na.rm = TRUE)
+df_heatmap$Var1 <- factor(df_heatmap$Var1, levels = trait_order)
+df_heatmap$Var2 <- factor(df_heatmap$Var2, levels = trait_order)
+
+df_heatmap$label <- ifelse(df_heatmap$Var1 == df_heatmap$Var2, "", round(df_heatmap$value, 2))
+
+bw_dx_plot <- ggplot(df_heatmap, aes(Var1, Var2)) +
+    geom_tile(aes(fill = value), color = "white") +
+    geom_text(aes(label = label), size = 5.5) +
+    scale_fill_gradient2(low = "blue", high = "orange", mid = "white", midpoint = 0, limit = c(-0.5, 1), breaks = c(-0.5, 0, 0.5, 1.0), labels = c("-0.5", "0.0", "0.5", "1.0"), name="Correlation") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(color = "black", size = 20, 
+                                     angle = 45, vjust = 1, hjust = 1
+                                     ),
+          axis.text.y = element_text(color = "black", size = 20),
+          axis.title = element_text(color = "black", size = 20),
+          legend.text = element_text(color = "black", size = 20),
+          panel.grid = element_blank(),
+          legend.position = "top",
+          legend.title = element_text(color = "black", size = 20),
+    ) +
+    labs(x = "", y = "") +
+    coord_fixed()
+bw_dx_plot
+
+df_wide <- ldsc_metabo_dx %>%
+    dplyr::select(disorder, metabolite, rg) %>%
+    pivot_wider(names_from = disorder, values_from = rg) %>%
+    dplyr::select(metabolite, BMI, T2D, CAD, Stroke, PD, AD)
+
+spearman_results <- cor(df_wide[,-1], method = "spearman", use = "pairwise.complete.obs")
+spearman_results[lower.tri(spearman_results)] <- NA
+rg_matrix[upper.tri(rg_matrix)] <- NA
+
+spearman_results
+rg_matrix
+if (all(dim(spearman_results) == dim(rg_matrix))) {
+    combined_matrix <- rg_matrix
+    combined_matrix[upper.tri(combined_matrix)] <- spearman_results[upper.tri(spearman_results)]
+    combined_matrix
+} else {
+    stop("The dimensions of the matrices do not match!")
+}
+
+df_combined <- reshape2::melt(combined_matrix, na.rm = TRUE)
+df_combined$label <- ifelse(df_combined$Var1 == df_combined$Var2, "", round(df_combined$value, 2))
+
+heat_bwDx <- df_combined %>%
+    ggplot(aes(Var1, Var2)) +
+    geom_tile(aes(fill = value), color = "white") +
+    geom_text(aes(label = label), size = 5.5) +  # Label each box except diagonal
+    scale_fill_gradient2(low = "blue", high = "orange", mid = "white", midpoint = 0, limit = c(-1, 1), breaks = c(-1, -0.5, 0, 0.5, 1), labels = c("-1.0", "-0.5", "0.0", "0.5", "1.0"), name="") + # name="rs / rg"
+    theme_minimal() +
+    theme(axis.text.x = element_text(color = "black", size = 20),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+          axis.text.y = element_text(color = "black", size = 20),
+          legend.text = element_text(color = "black", size = 20),
+          panel.grid = element_blank(),
+          legend.position = "right",
+          legend.title = element_text(color = "black", size = 20),
+          axis.line.x = element_line(color = "black"),
+          axis.line.y = element_line(color = "black"),
+          legend.key.size = unit(1, "cm"),
+          plot.background = element_rect(fill = "white", color = "white"),  # Set plot background to white
+          panel.background = element_rect(fill = "white", color = "white")
+    ) +
+    guides(fill = guide_colorbar(title.position = "top", title.hjust = 0)) + # Set the title above the legend
+    labs(x = "Genetic correlation (rg)", y = "Spearman correlation (rs)") +
+    coord_fixed()
+heat_bwDx
+
+```
+
+### Heatmap 
+
+```{r ldsc-heatmap}
+
+metabo_heatmap <- ldsc_metabo_dx %>% 
+    dplyr::select(disorder, metabolite, rg) %>%
+    reshape2::dcast(metabolite ~ disorder, value.var = "rg")
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+
+metabolite_order <- hclust(dist(metabo_heatmap[,-1]), method = "complete")$order
+
+ldsc_metabo_dx$metabolite <- factor(ldsc_metabo_dx$metabolite, levels = metabo_heatmap$metabolite[metabolite_order])
+
+ldsc_metabo_dx$disorder <- factor(ldsc_metabo_dx$disorder, levels = trait_order)
+
+heatmap_metabo_plot <- 
+    ldsc_metabo_dx %>% 
+    ggplot(aes(x = disorder, y = metabolite, fill = rg)) +
+    geom_tile() +
+    scale_fill_gradient2(low = "blue", high = "orange", mid = "white", midpoint = 0, limit = c(-0.6, 0.6), breaks = c(-0.6, -0.3, 0, 0.3, 0.6), labels = c("-0.6", "-0.3", "0.0", "0.3", "0.6"), name = "rg") +
+    theme_minimal() +
+  theme(axis.text.x = element_text(color = "black", size = 20),
+        legend.text = element_text(color = "black", size = 20),
+        legend.title = element_text(color = "black", size = 20),
+        panel.background = element_rect(colour = 'white', fill = 'white'),
+        legend.background = element_rect(colour = 'white', fill = 'white'),
+        plot.background = element_rect(colour = 'white', fill = 'white'),
+        axis.text.y = element_blank(),
+        panel.grid = element_blank(),
+        axis.line.x = element_line(color = "black"),
+        axis.line.y = element_line(color = "black"),
+        legend.key.size = unit(0.7, "cm"),
+        legend.spacing = unit(1, "cm"),
+        legend.position = "right",
+        plot.margin = margin(5, 40, 5, 20),
+        axis.title = element_blank()) +
+  ggnewscale::new_scale_fill() +
+    scale_fill_manual(values = setNames(ldsc_metabo_dx$newColor,  ldsc_metabo_dx$group)) +
+  geom_tile(ldsc_metabo_dx, stat = "identity", inherit.aes = F,
+            mapping = aes(y = metabolite, 
+                          x = 6.7, 
+                          fill = group, width = .4)) +
+  guides(fill = guide_legend(title = "Metabolite category", ncol = 1))
+heatmap_metabo_plot
+
+```
+
+### Fig2
+
+```{r combined plot}
+
+combined_vol_heat_mat <- ggpubr::ggarrange(combined_vol, 
+                                  heat_bwDx, 
+                                  ncol=1, 
+                                  nrow=2,
+                                  labels = c("a", "b"),
+                                  font.label = list(size = 20),
+                                  heights = c(1.8, 1),
+                                  widths = c(1, 3)
+                                  )
+combined_vol_heat_mat
+
+combined_heatmap_vol <- ggpubr::ggarrange(
+    combined_vol_heat_mat,
+    heatmap_metabo_plot,
+    ncol = 2,
+    nrow = 1,
+    font.label = list(size = 20),
+    widths = c(1.2, 2),
+    labels = c(" ", "c")
+)
+combined_heatmap_vol
+
+ggsave(
+    #here::here("img/main_figs/Fig2_LDSC_400dpi.tiff"),
+    here::here("img/main_figs/Fig2_LDSC_400dpi.pdf"),
+    plot = combined_heatmap_vol,
+    width = 19.7,
+    height = 16.5,
+    units = "in",
+    #device = 'tiff',
+    device = "pdf",
+    dpi = 400,
+    bg = "white"
+)
+
+```
+
+### ST4
+
+```{r suppl-table-4}
+
+st4 <- ldsc_metabo_dx %>% 
+    dplyr::mutate(fdr = p.adjust(p, method = "fdr")) %>% 
+    dplyr::select(disorder, metabolite, rg, se, p, fdr) %>%
+    dplyr::left_join(dict) %>% 
+    dplyr::select(prettyName, disorder, rg, se, p, fdr) %>%
+  pivot_wider(
+    names_from = disorder,
+    values_from = c(rg, se, p, fdr)
+  ) %>% 
+    rename(metabolite = prettyName) %>% 
+    dplyr::select(metabolite, rg_BMI, se_BMI, p_BMI, fdr_BMI,
+                  rg_T2D, se_T2D, p_T2D, fdr_T2D, 
+                  rg_CAD, se_CAD, p_CAD, fdr_CAD, 
+                  rg_Stroke, se_Stroke, p_Stroke, fdr_Stroke, 
+                  rg_PD, se_PD, p_PD, fdr_PD, 
+                  rg_AD, se_AD, p_AD, fdr_AD)
+
+data.table::fwrite(st4, here::here("data/suppl_tables/st4_ldsc_metabo_dx.txt"), sep = "\t")
+```
+
+### ST5
+
+```{r suppl-table-5}
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+
+st5 <- df %>% 
+    dplyr::rename(trait1 = p1,
+                  trait2 = p2) %>%
+  dplyr::mutate(
+    trait1 = factor(trait1, levels = trait_order),
+    trait2 = factor(trait2, levels = trait_order)
+  ) %>% 
+    arrange(trait1, trait2)
+
+data.table::fwrite(st5, here::here("data/suppl_tables/st5_ldsc_bw_dx.txt"), sep = "\t")
+
+```
+
+### GCG barplot
+
+```{r ldsc-gcg-dx-barplot}
+
+dx_gcg <- data.table::fread(here::here("data/ldsc/rg_results_GCG_dx_04092025.txt"))  %>%
+    dplyr::mutate(
+                  p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_dx/", "", p1),
+                  p1 = gsub(".LDSR", "", p1),
+                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_GCG/", "", p2),
+                  p2 = gsub(".LDSR", "", p2),
+                  p1 = gsub("CARDIOGRAM_CAD_2022", "CAD", p1), 
+                  p2 = gsub("CARDIOGRAM_CAD_2022", "CAD", p2),
+                  p1 = gsub("GIANT_BMI_2015_EUR", "BMI", p1),
+                  p2 = gsub("GIANT_BMI_2015_EUR", "BMI", p2),
+                  p1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p1),
+                  p2 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p2),
+                  p1 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p1),
+                  p2 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p2),
+                  p1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p1),
+                  p2 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p2),
+                  p1 = gsub("IPDGC_PD_2018", "PD_2018", p1),
+                  p2 = gsub("IPDGC_PD_2018", "PD_2018", p2),
+                  p1 = gsub("IPDGC_PD_2014_lift", "PD_2014", p1), # no UKB overlap
+                  p2 = gsub("IPDGC_PD_2014_lift", "PD_2014", p2),
+                  p1 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p1),
+                  p2 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p2),
+                  p1 = gsub("MEGAVCID_VaD_2024", "VaD", p1),
+                  p2 = gsub("MEGAVCID_VaD_2024", "VaD", p2),
+                  p1 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p1),
+                  p2 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p2)) %>%
+    dplyr::filter(p1 != "EADB_AD_2022", p2 != "EADB_AD_2022",
+                  p1 != "PD_2014", p2 != "PD_2014",
+                  p1 != "PD_2018", p2 != "PD_2018",
+                  p1 != "PGC_AD_2021_v2",
+                  p1 != "VaD", p2 != "VaD",
+                  p2 != "GIP", p2 != "glucagon") %>%
+    dplyr::select(p1, p2, rg, se, p) %>% 
+    dplyr::mutate(label = round(rg, 2),
+                  fdr = p.adjust(p, method = "fdr"))
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+
+dx_gcg$p1 <- factor(dx_gcg$p1, levels = rev(trait_order))
+
+matrix_gcg_metabo_plot <- dx_gcg %>%
+    ggplot(aes(p2, p1)) +
+    geom_tile(aes(fill = rg), color = "white") +
+    geom_text(
+    aes(label = label,
+        #fontface = ifelse(fdr < 0.05, "bold", "plain")
+        ),
+    size = 6.5
+  ) +  
+    scale_fill_gradient2(low = "blue", high = "orange", mid = "white", midpoint = 0, limit = c(-1, 1), 
+                         breaks = c(-1, -0.5, 0, 0.5, 1), labels = c("-1.0", "-0.5", "0.0", "0.5", "1.0"), name="rg") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(color = "black", size = 20),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+          axis.text.y = element_text(color = "black", size = 20),
+          legend.text = element_text(color = "black", size = 20),
+          panel.grid = element_blank(),
+          legend.position = "right",
+          legend.title = element_text(color = "black", size = 20),
+          axis.line.x = element_line(color = "black"),
+          axis.line.y = element_line(color = "black"),
+          legend.key.size = unit(1, "cm"),
+          plot.background = element_rect(fill = "white", color = "white"),  
+          panel.background = element_rect(fill = "white", color = "white"),  
+          legend.background = element_rect(fill = "white", color = "white")  # Ensures the legend background is white
+    ) +
+    guides(fill = guide_colorbar(title.position = "top", title.hjust = 0)) +  
+    labs(x = " ", y = " ") +
+    coord_fixed()
+matrix_gcg_metabo_plot
+
+```
+
+### Suppl Fig3
+
+```{r}
+
+trait_order <- c("AD","PD", "Stroke", "CAD", "T2D", "BMI")
+
+mr_gcg_dx <- data.table::fread(here::here("data/mr/MR__exposure_dx_outcome_GCG.csv")) %>% 
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method),
+                  outcome = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", outcome),
+                  outcome = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", outcome),
+                  outcome = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", outcome),
+                  outcome = gsub("GIANT_BMI_2015_EUR.STD", "BMI", outcome),
+                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", outcome),
+                  outcome = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", outcome),
+                  fdr = p.adjust(pval, method = "fdr")) %>% 
+     dplyr::mutate(CI_lower = (b - 1.96 * se),
+                  CI_upper = (b + 1.96 * se)) %>% 
+    dplyr::filter(outcome != "IPDGC_PD_2014_lift.STD", outcome != "IPDGC_PD_2018.STD",
+                exposure == "GCG") %>% 
+    dplyr::filter(method == "IVW")
+
+mr_gcg_dx$outcome <- factor(mr_gcg_dx$outcome, levels = trait_order)
+
+forest.gcg.dx <- mr_gcg_dx %>%
+    dplyr::mutate(title = "GCG → Trait",
+                  p_label = case_when(
+                      fdr < 0.05 ~ "FDR < 5%",  
+                      pval < 0.05 ~ "P < 0.05",
+                      TRUE ~ "P ≥ 0.05"
+                  ),
+                  row_number = as.numeric(factor(outcome))
+                  ) %>%  
+    ggplot(aes(x = b, y = outcome)) +
+    geom_rect(data = . %>% filter(row_number %% 2 == 0),
+              aes(ymin = row_number - 0.5, ymax = row_number + 0.5, xmin = -Inf, xmax = Inf),
+              fill = "grey95", alpha = 0.5, inherit.aes = FALSE) +
+    geom_vline(xintercept = 0, lty = 1, size = 0.3, color = "black") +
+    geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper),
+                   height = 0, color = "#FFB400") +  #"#9467BD"
+    geom_point(aes(size = p_label), color = "#FFB400") +  #"#9467BD"
+    scale_size_manual(name = "Significance", 
+                      values = c("FDR < 5%" = 8, "P < 0.05" = 6, "P ≥ 0.05" = 4)) +  
+    scale_x_continuous(limits = c(-0.8, 0.8), breaks = c(-0.8, -0.4, 0, 0.4, 0.8)) +  
+    theme_bw() +
+    labs(x = "MR IVW coefficient (95% CI)",
+         y = "Outcome") +
+    theme(panel.grid = element_blank(),
+          legend.position = "right",
+          legend.direction = "vertical",
+          legend.title = element_text(size = 20),
+          legend.text = element_text(size = 20, colour = "black"),
+          strip.text.x = element_text(colour = "black", size = 20),
+          strip.text.y = element_blank(),
+          strip.background = element_blank(),
+          axis.text = element_text(size = 20, colour = "black"),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(r = 15))) +
+    facet_grid( ~ title, scales = "free_y", switch = "y", space = "free_y")
+forest.gcg.dx
+
+mr_dx_gcg <- data.table::fread(here::here("data/mr/MR__exposure_GCG_outcome_dx.csv")) %>% 
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method),
+                  exposure = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", exposure),
+                  exposure = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", exposure),
+                  exposure = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", exposure),
+                  exposure = gsub("GIANT_BMI_2015_EUR.STD", "BMI", exposure),
+                  exposure = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", exposure),
+                  exposure = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", exposure),
+                  fdr = p.adjust(pval, method = "fdr")) %>% 
+     dplyr::mutate(CI_lower = (b - 1.96 * se),
+                  CI_upper = (b + 1.96 * se)) %>% 
+    dplyr::filter(exposure != "IPDGC_PD_2014_lift.STD", exposure != "IPDGC_PD_2018.STD",
+                outcome == "GCG") %>% 
+    dplyr::filter(method == "IVW")
+
+mr_dx_gcg$exposure <- factor(mr_dx_gcg$exposure, levels = trait_order)
+
+forest.dx.gcg <- mr_dx_gcg %>%
+    dplyr::mutate(title = "Trait → GCG",
+                  p_label = case_when(
+                      fdr < 0.05 ~ "FDR < 5%",  
+                      pval < 0.05 ~ "P < 0.05",
+                      TRUE ~ "P ≥ 0.05"
+                  ),
+                  row_number = as.numeric(factor(exposure))
+                  ) %>%  
+    ggplot(aes(x = b, y = exposure)) +
+    geom_rect(data = . %>% filter(row_number %% 2 == 0),
+              aes(ymin = row_number - 0.5, ymax = row_number + 0.5, xmin = -Inf, xmax = Inf),
+              fill = "grey95", alpha = 0.5, inherit.aes = FALSE) +
+    geom_vline(xintercept = 0, lty = 1, size = 0.3, color = "black") +
+    geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper),
+                   height = 0, color = "#FFB400") + 
+    geom_point(aes(size = p_label), color = "#FFB400") +  # Use p_label for legend "#FFA500"
+    scale_size_manual(name = "", 
+                      values = c("FDR < 5%" = 8, "P < 0.05" = 6, "P ≥ 0.05" = 4)) +  
+    scale_x_continuous(limits = c(-0.3, 0.3), breaks = c(-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3)) +  
+    scale_shape_discrete(name = "MR method") +  
+    theme_bw() +
+    labs(x = "MR IVW coefficient (95% CI)",
+         y = "Exposure") +
+    theme(panel.grid = element_blank(),
+          legend.position = "right",
+          legend.direction = "vertical",
+          legend.title = element_text(size = 20),
+          legend.text = element_text(size = 20, colour = "black"),
+          strip.text.x = element_text(colour = "black", size = 20),
+          strip.text.y = element_blank(),
+          strip.background = element_blank(),
+          axis.text = element_text(size = 20, colour = "black"),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(r = 15))) +
+    facet_grid( ~ title, scales = "free_y", switch = "y", space = "free_y")
+forest.dx.gcg
+
+combo.forest.dx.gcg <- ggpubr::ggarrange(
+    forest.dx.gcg,
+    forest.gcg.dx,
+    ncol = 2,
+    nrow = 1,
+    common.legend = TRUE,
+    legend = "right",
+    labels = c("b", "c"),
+    font.label = list(size = 20)
+)
+combo.forest.dx.gcg
+
+gcg.rg.mr <- ggpubr::ggarrange(
+    matrix_gcg_metabo_plot,
+    combo.forest.dx.gcg,
+    ncol = 2,
+    nrow = 1,
+    common.legend = F,
+    widths = c(1,2),
+    labels = c("a", ""),
+    font.label = list(size = 20)
+)
+gcg.rg.mr
+
+ggsave(
+    here::here("img/suppl_figs/SupplFig3_GCG_MR.png"),
+    plot = gcg.rg.mr,
+    width = 18,
+    height = 6.5,
+    device = 'png',
+    dpi = 150,
+    bg = "white"
+)
+```
+
+### ST6
+
+```{r suppl-table-6}
+
+st6 <- data.table::fread(here::here("data/ldsc/rg_results_GCG_dx_04092025.txt"))  %>%
+    dplyr::mutate(
+                  p1 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_dx/", "", p1),
+                  p1 = gsub(".LDSR", "", p1),
+                  p2 = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/sumstats/formatted_GCG/", "", p2),
+                  p2 = gsub(".LDSR", "", p2),
+                  p1 = gsub("CARDIOGRAM_CAD_2022", "CAD", p1), 
+                  p2 = gsub("CARDIOGRAM_CAD_2022", "CAD", p2),
+                  p1 = gsub("GIANT_BMI_2015_EUR", "BMI", p1),
+                  p2 = gsub("GIANT_BMI_2015_EUR", "BMI", p2),
+                  p1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p1),
+                  p2 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", p2),
+                  p1 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p1),
+                  p2 = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", p2),
+                  p1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p1),
+                  p2 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", p2),
+                  p1 = gsub("IPDGC_PD_2018", "PD_2018", p1), ## change
+                  p2 = gsub("IPDGC_PD_2018", "PD_2018", p2),
+                  p1 = gsub("IPDGC_PD_2014_lift", "PD_2014", p1),
+                  p2 = gsub("IPDGC_PD_2014_lift", "PD_2014", p2),
+                  p1 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p1),
+                  p2 = gsub("T2DGGI_T2D_2024_EUR", "T2D", p2),
+                  p1 = gsub("MEGAVCID_VaD_2024", "VaD", p1),
+                  p2 = gsub("MEGAVCID_VaD_2024", "VaD", p2),
+                  p1 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p1),
+                  p2 = gsub("EADB_AD_2022_metadata", "EADB_AD_2022", p2)) %>%
+    dplyr::filter(p1 != "EADB_AD_2022", 
+                  p2 != "EADB_AD_2022",
+                  p1 != "PD_2014", 
+                  p2 != "PD_2014",
+                  p1 != "PD_2018", 
+                  p2 != "PD_2018",
+                  p1 != "VaD", 
+                  p2 != "VaD") %>%
+    dplyr::select(p1, p2, rg, se, p) %>% 
+    dplyr::mutate(fdr = p.adjust(p, method = "fdr")) %>% 
+    dplyr::mutate(p1 = factor(p1, levels = c("BMI", "T2D", "CAD", "Stroke", "PD", "AD"))) %>% 
+    dplyr::rename(trait1 = p1,
+                  trait2 = p2) %>% 
+    arrange(trait1) %>% 
+    dplyr::filter(trait2!= "GIP" & trait2 != "glucagon" & !is.na(trait1))
+st6
+
+data.table::fwrite(st6, here::here("data/suppl_tables/st6_ldsc_gcg.txt"), sep = "\t")
+
+```
+
+## Bivariate MiXeR
+
+```{r load-bivar-mixer-data}
+
+dict <- data.table::fread(here::here("data-raw/metaboDict_250331.txt"))
+mixer_new <- data.table::fread(here::here("data/mixer/mixer_results.csv"))
+
+mixer_new2 <- mixer_new %>%
+    dplyr::filter(best_vs_min_AIC != "") %>% 
+    dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
+                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
+                trait2 = gsub(".STD.noMHC.Z", "", trait2),
+                trait1 = gsub(".STD.noMHC", "", trait1),
+                trait1 = gsub("PGC_AD_2021_noUKB_no23andMe.nochr19", "AD", trait1),
+                trait1 = gsub("IPDGC_PD_2018", "PD", trait1),
+                ) %>% 
+    dplyr::rename(
+        rg_mean = `rg (mean)`,
+        rg_std = `rg (std)`,
+    poly_mean = `nc1@p9 (mean)`,
+    poly_std = `nc1@p9 (std)`,
+    poly2_mean = `nc2@p9 (mean)`,
+    poly2_std = `nc2@p9 (std)`,
+    overlap_mean = `nc12@p9 (mean)`,
+    overlap_std = `nc12@p9 (std)`,
+    concordance_mean = `fraction_concordant_within_shared (mean)`,
+    disorder = trait1,
+    metabolite = trait2
+  ) %>% 
+    dplyr::select(-fname) %>% 
+    left_join(dict) %>% 
+    dplyr::mutate(percent_overlap = overlap_mean / (poly_mean + overlap_mean + poly2_mean)) 
+
+mixer_glutamine <- data.table::fread(here::here("data/mixer/NORMENT_PD_2023_Braintyphoon_vs_Glutamine.csv")) %>%
+    dplyr::filter(best_vs_min_AIC != "") %>% 
+    dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
+                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
+                trait2 = gsub(".STD.noMHC.Z", "", trait2),
+                trait1 = gsub(".STD.noMHC", "", trait1),
+                trait1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", trait1),
+                ) %>% 
+    dplyr::rename(
+        rg_mean = `rg (mean)`,
+        rg_std = `rg (std)`,
+    poly_mean = `nc1@p9 (mean)`,
+    poly_std = `nc1@p9 (std)`,
+    poly2_mean = `nc2@p9 (mean)`,
+    poly2_std = `nc2@p9 (std)`,
+    overlap_mean = `nc12@p9 (mean)`,
+    overlap_std = `nc12@p9 (std)`,
+    concordance_mean = `fraction_concordant_within_shared (mean)`,
+    disorder = trait1,
+    metabolite = trait2
+  ) %>% 
+    dplyr::select(-fname) %>% 
+    left_join(dict) %>% 
+    dplyr::mutate(percent_overlap = overlap_mean / (poly_mean + overlap_mean + poly2_mean)) 
+
+```
+
+
+```{r}
+
+mixer_gcg <- data.table::fread(here::here("data/mixer/mixer_gcg_results.csv"))
+
+mixer_gcg2 <- mixer_gcg %>%
+    dplyr::filter(best_vs_min_AIC != "") %>% 
+  dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
+                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
+                trait2 = gsub(".STD.noMHC.Z", "", trait2),
+                trait2 = gsub(".STD.noMHC", "", trait2),
+                trait1 = gsub(".STD.noMHC", "", trait1),
+                trait1 = gsub("CARDIOGRAM_CAD_2022", "CAD", trait1),
+                trait1 = gsub("GIANT_BMI_2015_EUR", "BMI", trait1),
+                trait1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", trait1),
+                trait1 = gsub("T2DGGI_T2D_2024_EUR.Z", "T2D", trait1),
+                trait1 = gsub("PGC_AD_2021_noUKB_no23andMe.nochr19", "AD", trait1),
+                trait1 = gsub("IPDGC_PD_2018", "PD_2018", trait1),
+                trait1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", trait1),
+                ) %>% 
+    dplyr::rename(
+        rg_mean = `rg (mean)`,
+        rg_std = `rg (std)`,
+    poly_mean = `nc1@p9 (mean)`,
+    poly_std = `nc1@p9 (std)`,
+    poly2_mean = `nc2@p9 (mean)`,
+    poly2_std = `nc2@p9 (std)`,
+    overlap_mean = `nc12@p9 (mean)`,
+    overlap_std = `nc12@p9 (std)`,
+    concordance_mean = `fraction_concordant_within_shared (mean)`,
+    disorder = trait1,
+    trait = trait2
+  ) %>% 
+    dplyr::select(-fname) %>% 
+     mutate(percent_overlap = overlap_mean / (poly_mean + overlap_mean + poly2_mean)) 
+
+```
+
+### ggridges
+
+```{r}
+
+library(ggridges)
+
+ridgeline_plot_rg <- mixer_new2 %>%
+        dplyr::mutate(group = gsub("Glycolysis related metabolites", "Glycolysis", group),
+                      group = gsub("Relative lipoprotein lipid concentrations", "Rel lipoprotein lipid conc", group),
+                      group = gsub("Lipoprotein particle concentrations", "Lipoprotein particle conc", group),
+        ) %>% 
+    dplyr::filter(group != "Inflammation" & group != "Fluid balance" & group != "Apolipoproteins") %>% 
+  ggplot(aes(x = rg_mean, y = factor(group, levels = rev(sort(unique(group)))), fill = disorder)) +  
+  geom_vline(xintercept = 0) +
+  ggridges::geom_density_ridges(alpha = 0.65, scale = 2, size = 0.3, color = "black") +  
+  scale_fill_manual(values = c("AD" = "#1f78b4", "PD" = "#b2df8a")) + 
+  theme_bw() +
+  labs(x = "", y = "", fill = "", title = "Genetic correlation") +
+  theme(
+    panel.grid = element_blank(),
+    legend.position = "none",
+    plot.title = element_text(size = 22, colour = "black", hjust = 0.5),
+    legend.text = element_text(size = 22, colour = "black"),
+    axis.text.y = element_text(size = 22, colour = "black"),
+    axis.title.y = element_text(size = 22, colour = "black"),
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(size = 22, colour = "black"),
+    axis.title = element_text(size = 22, colour = "black")
+  )
+
+ridgeline_plot_rg <- ridgeline_plot_rg +
+  theme(plot.margin = margin(5.5, 10, 5.5, 5.5))  # top, right, bottom, left
+
+ridgeline_plot_overlap <- mixer_new2 %>%
+        dplyr::mutate(group = gsub("Glycolysis related metabolites", "Glycolysis", group),
+                      group = gsub("Relative lipoprotein lipid concentrations", "Rel lipoprotein lipid conc", group),
+                      group = gsub("Lipoprotein particle concentrations", "Lipoprotein particle conc", group),
+        ) %>% 
+    dplyr::filter(group != "Inflammation" & group != "Fluid balance" & group != "Apolipoproteins") %>% 
+  ggplot(aes(x = percent_overlap, y = factor(group, levels = rev(sort(unique(group)))), fill = disorder)) +  
+  geom_vline(xintercept = 0) +
+  ggridges::geom_density_ridges(alpha = 0.65, scale = 2, size = 0.3, color = "black") +  
+  scale_fill_manual(values = c("AD" = "#1f78b4", "PD" = "#b2df8a")) + 
+  theme_bw() +
+  labs(x = "", y = "", fill = "", title = "Fraction of shared trait-influencing variants") +
+  theme(
+    panel.grid = element_blank(),
+    legend.position = "none",
+    plot.title = element_text(size = 22, colour = "black", hjust = 0.5),
+    legend.text = element_text(size = 22, colour = "black"),
+    axis.text.y = element_text(size = 22, colour = "black"),
+    axis.title.y = element_text(size = 22, colour = "black"),
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_text(size = 22, colour = "black"),
+    axis.title = element_text(size = 22, colour = "black")
+  )
+
+ridgeline_plot_rg_clean <- ridgeline_plot_rg +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank())
+
+ridgeline_plot_rg_clean <- ridgeline_plot_rg_clean +
+  theme(plot.margin = margin(5.5, 20, 5.5, 5.5)) 
+
+combined_ridge_plot <- cowplot::plot_grid(
+  ridgeline_plot_overlap,
+  ridgeline_plot_rg_clean,
+  ncol = 2,
+  rel_widths = c(1, 0.65),
+  labels = c("a", ""), 
+  label_size = 22,
+  label_fontface = "bold"
+)
+combined_ridge_plot
+
+```
+
+### Venn
+
+### Suppl Fig4
+
+```{r bivariate-mixer-glutamine}
+
+library(eulerr)
+library(gridExtra)
+
+df_pd <- mixer_glutamine %>%
+  dplyr::filter(sumstatName == "NORMENT_PD_2023_Braintyphoon_vs_Glutamine")
+df_ad <- mixer_new2 %>%
+  dplyr::filter(sumstatName == "PGC_AD_2021_noUKB_no23andMe_nochr19_vs_Glutamine")
+df_bmi <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "GIANT_BMI_2015_EUR_vs_Glutamine")
+df_t2d <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "T2DGGI_T2D_2024_EUR_vs_Glutamine")
+df_cad <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "CARDIOGRAM_CAD_2022_vs_Glutamine")
+df_stroke <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "MEGASTROKE_STROKE_2022_AS_vs_Glutamine")
+
+# Helper function to prepare data
+prep_df <- function(df){
+  df %>%
+    mutate(
+      trait_mean = poly_mean / 1000,
+      trait_std = round(poly_std / 1000, 2),
+      tyrosine_mean = poly2_mean / 1000,
+      tyrosine_std = round(poly2_std / 1000, 2),
+      overlap_mean = overlap_mean,
+      overlap_std = round(overlap_std / 1000, 2),
+      rg_value = rg_mean,
+      cr_value = concordance_mean
+    ) %>%
+    dplyr::select(trait_mean, trait_std, tyrosine_mean, tyrosine_std, overlap_mean, overlap_std, rg_value, cr_value)
+}
+
+# Euler plot
+make_venn <- function(trait_mean, metabo_mean, overlap_mean, colors, trait_label, metabo_label, overlap_label){
+  fit <- euler(c(trait = trait_mean, metabo = metabo_mean, "trait&metabo" = overlap_mean), shape = "circle")
+  plot(fit,
+       fills = list(fill = colors),
+       edges = list(lty = 1, lwd = 5, col = 'white'),
+       labels = list(labels = c("", "")),
+       quantities = list(
+         type = "counts",
+         labels = c(trait_label, metabo_label, overlap_label),
+         col = "black", font = "calibri", fontface = "plain", cex = 2, lineheight = 1.5
+       ),
+       key.width = 3, key.height = 1
+  )
+}
+
+# rg bar
+make_bar <- function(rg_value){
+  fill_color <- ifelse(rg_value > 0, "red", "blue")
+  bar_data <- data.frame(xmin = -1, xmax = 1, ymin = 0, ymax = 1)
+  ggplot() +
+    geom_rect(data = bar_data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "white") +
+    geom_rect(aes(xmin = 0, xmax = rg_value, ymin = -Inf, ymax = Inf), fill = fill_color, alpha = 0.4) +
+    geom_vline(xintercept = 0, color = "black", size = 1) +
+    annotate("text", x = -0.6, y = 0.5,
+             label = bquote(italic(r)[g] == .(signif(rg_value, 2))),
+             color = "black", size = 8, fontface = "plain") +
+    scale_x_continuous(expand = c(0,0), limits = c(-1,1)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_blank(),
+          axis.title = element_blank(),
+          axis.ticks = element_blank(),
+          axis.line.x = element_line(),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8))
+}
+
+# cr bar
+make_cr <- function(cr_value){
+  fill_color <- ifelse(cr_value > 0.5, "red", "blue")
+  bar_data <- data.frame(xmin = 0, xmax = 1, ymin = 0, ymax = 1)
+  ggplot() +
+    geom_rect(data = bar_data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "white") +
+    geom_rect(aes(xmin = 0.5, xmax = cr_value, ymin = -Inf, ymax = Inf), fill = fill_color, alpha = 0.4) +
+    geom_vline(xintercept = 0.5, color = "black", size = 1) +
+    annotate("text", x = 0.2, y = 0.5,
+             label = bquote(italic(c)[r] == .(signif(cr_value, 2))),
+             color = "black", size = 8, fontface = "plain") +
+    scale_x_continuous(expand = c(0,0), limits = c(0,1)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_blank(),
+          axis.title = element_blank(),
+          axis.ticks = element_blank(),
+          axis.line.x = element_line(),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8))
+}
+
+# Trait order
+trait_order <- c("BMI", "CAD",  "T2D", "Stroke", "AD", "PD")
+trait_list <- list(BMI = df_bmi, Stroke = df_stroke, T2D = df_t2d, CAD = df_cad, AD = df_ad, PD = df_pd)
+
+# Colors
+trait_colors <- list(
+  PD = c("#b2df8a", "#e7f5db", "grey90"),
+  AD = c("#1f78b4", "#a5c9e1", "grey90"),
+  BMI = c("#fb9a99", "#fdd0a2", "grey90"),
+  T2D = c("#cab2d6", "#e0bee6", "grey90"),
+  CAD = c("#ffff99", "#ffffcc", "grey90"),
+  Stroke = c("#8dd3c7", "#ccece6", "grey90")
+)
+
+plot_glutamine <- list()
+
+for(trait_name in trait_order){
+  df_trait <- trait_list[[trait_name]]
+  df_prep <- prep_df(df_trait)
+  
+  trait_mean <- as.numeric(df_trait$poly_mean[1])
+  metabo_mean <- as.numeric(df_trait$poly2_mean[1])
+  overlap_mean <- as.numeric(df_trait$overlap_mean[1])
+  
+  venn_plot <- make_venn(trait_mean, metabo_mean, overlap_mean, trait_colors[[trait_name]],
+                         round(trait_mean,0), round(metabo_mean,0), round(overlap_mean,0))
+  
+  bar_plot <- make_bar(as.numeric(df_prep$rg_value[1]))
+  cr_plot <- make_cr(as.numeric(df_prep$cr_value[1]))
+  
+  title <- grid::textGrob(paste0(trait_name, " | Glutamine"), gp = grid::gpar(fontsize = 22, fontface = "bold"))
+  
+  combined <- grid.arrange(title, venn_plot, bar_plot, cr_plot, ncol=1, heights = c(0.2,2,0.4,0.4))
+  plot_glutamine[[trait_name]] <- combined
+}
+
+# Arrange in 3x2 grid
+combined_grid <- marrangeGrob(grobs = plot_glutamine, nrow = 2, ncol = 3, top = NULL)
+
+ggsave(
+  filename = here::here("img/suppl_figs/SupplFig4_bivar_mixer_dx_glutamine.tiff"),
+  plot = combined_grid,
+  device = "tiff",
+  width = 20,
+  height = 18,
+  dpi = 400
+)
+
+# Trait order (only keep the three you want)
+trait_order <- c("T2D", "PD", "AD")
+trait_list <- list(T2D = df_t2d, PD = df_pd, AD = df_ad)
+
+# Colors (subset too if you like, but not strictly necessary)
+trait_colors <- list(
+  T2D = c("#cab2d6", "#e0bee6", "grey90"),
+  AD  = c("#1f78b4", "#a5c9e1", "grey90"),
+  PD  = c("#b2df8a", "#e7f5db", "grey90")
+)
+
+plot_glutamine <- list()
+
+for(trait_name in trait_order){
+  df_trait <- trait_list[[trait_name]]
+  df_prep <- prep_df(df_trait)
+  
+  trait_mean <- as.numeric(df_trait$poly_mean[1])
+  metabo_mean <- as.numeric(df_trait$poly2_mean[1])
+  overlap_mean <- as.numeric(df_trait$overlap_mean[1])
+  
+  venn_plot <- make_venn(trait_mean, metabo_mean, overlap_mean, trait_colors[[trait_name]],
+                         round(trait_mean,0), round(metabo_mean,0), round(overlap_mean,0))
+  
+  bar_plot <- make_bar(as.numeric(df_prep$rg_value[1]))
+  cr_plot <- make_cr(as.numeric(df_prep$cr_value[1]))
+  
+  title <- grid::textGrob(paste0(trait_name, " | Glutamine"), gp = grid::gpar(fontsize = 22, fontface = "bold"))
+  
+  combined <- grid.arrange(title, venn_plot, bar_plot, cr_plot, ncol=1, heights = c(0.2,2,0.4,0.4))
+  plot_glutamine[[trait_name]] <- combined
+}
+
+# Arrange in grid (3 panels — e.g. 1 row x 3 columns)
+combined_grid_glutamine <- marrangeGrob(grobs = plot_glutamine, nrow = 1, ncol = 3, top = NULL)
+combined_grid_glutamine
+
+```
+
+### Suppl Fig5
+
+```{r bivariate-mixer-ad}
+
+df_pd <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "NORMENT_PD_2023_Braintyphoon_vs_GCG")
+df_ad <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "PGC_AD_2021_noUKB_no23andMe_nochr19_vs_GCG")
+df_bmi <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "GIANT_BMI_2015_EUR_vs_GCG")
+df_t2d <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "T2DGGI_T2D_2024_EUR_vs_GCG")
+df_cad <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "CARDIOGRAM_CAD_2022_vs_GCG")
+df_stroke <- mixer_gcg2 %>%
+  dplyr::filter(sumstatName == "MEGASTROKE_STROKE_2022_AS_vs_GCG")
+
+# Helper function to prepare data
+prep_df <- function(df){
+  df %>%
+    mutate(
+      trait_mean = poly_mean / 1000,
+      trait_std = round(poly_std / 1000, 2),
+      tyrosine_mean = poly2_mean / 1000,
+      tyrosine_std = round(poly2_std / 1000, 2),
+      overlap_mean = overlap_mean,
+      overlap_std = round(overlap_std / 1000, 2),
+      rg_value = rg_mean,
+      cr_value = concordance_mean
+    ) %>%
+    dplyr::select(trait_mean, trait_std, tyrosine_mean, tyrosine_std, overlap_mean, overlap_std, rg_value, cr_value)
+}
+
+# Euler plot
+make_venn <- function(trait_mean, metabo_mean, overlap_mean, colors, trait_label, metabo_label, overlap_label){
+  fit <- euler(c(trait = trait_mean, metabo = metabo_mean, "trait&metabo" = overlap_mean), shape = "circle")
+  plot(fit,
+       fills = list(fill = colors),
+       edges = list(lty = 1, lwd = 5, col = 'white'),
+       labels = list(labels = c("", "")),
+       quantities = list(
+         type = "counts",
+         labels = c(trait_label, metabo_label, overlap_label),
+         col = "black", font = "calibri", fontface = "plain", cex = 2, lineheight = 1.5
+       ),
+       key.width = 3, key.height = 1
+  )
+}
+
+# rg bar
+make_bar <- function(rg_value){
+  fill_color <- ifelse(rg_value > 0, "red", "blue")
+  bar_data <- data.frame(xmin = -1, xmax = 1, ymin = 0, ymax = 1)
+  ggplot() +
+    geom_rect(data = bar_data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "white") +
+    geom_rect(aes(xmin = 0, xmax = rg_value, ymin = -Inf, ymax = Inf), fill = fill_color, alpha = 0.4) +
+    geom_vline(xintercept = 0, color = "black", size = 1) +
+    annotate("text", x = -0.6, y = 0.5,
+             label = bquote(italic(r)[g] == .(signif(rg_value, 2))),
+             color = "black", size = 8, fontface = "plain") +
+    scale_x_continuous(expand = c(0,0), limits = c(-1,1)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_blank(),
+          axis.title = element_blank(),
+          axis.ticks = element_blank(),
+          axis.line.x = element_line(),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8))
+}
+
+# cr bar
+make_cr <- function(cr_value){
+  fill_color <- ifelse(cr_value > 0.5, "red", "blue")
+  bar_data <- data.frame(xmin = 0, xmax = 1, ymin = 0, ymax = 1)
+  ggplot() +
+    geom_rect(data = bar_data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "white") +
+    geom_rect(aes(xmin = 0.5, xmax = cr_value, ymin = -Inf, ymax = Inf), fill = fill_color, alpha = 0.4) +
+    geom_vline(xintercept = 0.5, color = "black", size = 1) +
+    annotate("text", x = 0.2, y = 0.5,
+             label = bquote(italic(c)[r] == .(signif(cr_value, 2))),
+             color = "black", size = 8, fontface = "plain") +
+    scale_x_continuous(expand = c(0,0), limits = c(0,1)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_blank(),
+          axis.title = element_blank(),
+          axis.ticks = element_blank(),
+          axis.line.x = element_line(),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8))
+}
+
+# Trait order
+trait_order <- c("BMI", "CAD",  "T2D", "Stroke", "AD", "PD")
+trait_list <- list(BMI = df_bmi, Stroke = df_stroke, T2D = df_t2d, CAD = df_cad, AD = df_ad, PD = df_pd)
+
+# Colors
+trait_colors <- list(
+  PD = c("#b2df8a", "#e7f5db", "grey90"),
+  AD = c("#1f78b4", "#a5c9e1", "grey90"),
+  BMI = c("#fb9a99", "#fdd0a2", "grey90"),
+  T2D = c("#cab2d6", "#e0bee6", "grey90"),
+  CAD = c("#ffff99", "#ffffcc", "grey90"),
+  Stroke = c("#8dd3c7", "#ccece6", "grey90")
+)
+
+plot_list <- list()
+
+for(trait_name in trait_order){
+  df_trait <- trait_list[[trait_name]]
+  df_prep <- prep_df(df_trait)
+  
+  trait_mean <- as.numeric(df_trait$poly_mean[1])
+  metabo_mean <- as.numeric(df_trait$poly2_mean[1])
+  overlap_mean <- as.numeric(df_trait$overlap_mean[1])
+  
+  venn_plot <- make_venn(trait_mean, metabo_mean, overlap_mean, trait_colors[[trait_name]],
+                         round(trait_mean,0), round(metabo_mean,0), round(overlap_mean,0))
+  
+  bar_plot <- make_bar(as.numeric(df_prep$rg_value[1]))
+  cr_plot <- make_cr(as.numeric(df_prep$cr_value[1]))
+  
+  title <- grid::textGrob(paste0(trait_name, " | GCG"), gp = grid::gpar(fontsize = 22, fontface = "bold"))
+  
+  combined <- grid.arrange(title, venn_plot, bar_plot, cr_plot, ncol=1, heights = c(0.2,2,0.4,0.4))
+  plot_list[[trait_name]] <- combined
+}
+
+# Arrange in 3x2 grid
+combined_gcg_grid <- marrangeGrob(grobs = plot_list, nrow = 2, ncol = 3, top = NULL)
+combined_gcg_grid
+
+ggsave(
+  filename = here::here("img/suppl_figs/SupplFig5_bivar_mixer_dx_gcg.tiff"),
+  plot = combined_gcg_grid,
+  device = "tiff",
+  width = 20,
+  height = 18,
+  dpi = 400
+)
+
+# Trait order (only keep the three you want)
+trait_order <- c("T2D", "PD", "AD")
+trait_list <- list(T2D = df_t2d, PD = df_pd, AD = df_ad)
+
+# Colors (subset too if you like, but not strictly necessary)
+trait_colors <- list(
+  T2D = c("#cab2d6", "#e0bee6", "grey90"),
+  AD  = c("#1f78b4", "#a5c9e1", "grey90"),
+  PD  = c("#b2df8a", "#e7f5db", "grey90")
+)
+
+plot_gcg <- list()
+
+for(trait_name in trait_order){
+  df_trait <- trait_list[[trait_name]]
+  df_prep <- prep_df(df_trait)
+  
+  trait_mean <- as.numeric(df_trait$poly_mean[1])
+  metabo_mean <- as.numeric(df_trait$poly2_mean[1])
+  overlap_mean <- as.numeric(df_trait$overlap_mean[1])
+  
+  venn_plot <- make_venn(trait_mean, metabo_mean, overlap_mean, trait_colors[[trait_name]],
+                         round(trait_mean,0), round(metabo_mean,0), round(overlap_mean,0))
+  
+  bar_plot <- make_bar(as.numeric(df_prep$rg_value[1]))
+  cr_plot <- make_cr(as.numeric(df_prep$cr_value[1]))
+  
+  title <- grid::textGrob(paste0(trait_name, " | GCG"), gp = grid::gpar(fontsize = 22, fontface = "bold"))
+  
+  combined <- grid.arrange(title, venn_plot, bar_plot, cr_plot, ncol=1, heights = c(0.2,2,0.4,0.4))
+  plot_gcg[[trait_name]] <- combined
+}
+
+combined_grid_gcg <- marrangeGrob(grobs = plot_gcg, nrow = 1, ncol = 3, top = NULL)
+combined_grid_gcg
+```
+
+### Fig3
+
+```{r}
+
+combined_grid_glutamine <- marrangeGrob(grobs = plot_glutamine, nrow = 1, ncol = 3, top = NULL)[[1]]
+combined_grid_gcg <- marrangeGrob(grobs = plot_gcg, nrow = 1, ncol = 3, top = NULL)[[1]]
+
+fig3_mixer <- cowplot::plot_grid(
+    combined_ridge_plot,
+    combined_grid_glutamine,
+    combined_grid_gcg,
+    ncol = 1,        
+    nrow = 3,       
+    labels = c("", "b", "c"),  
+    label_size = 22,       
+    label_fontface = "bold",
+    rel_heights = c(1.6, 0.8, 0.8),
+    rel_widths = c(1.6, 0.8, 0.8)  # Left panel is twice as wide as the right
+) + theme(plot.background = element_rect(fill = "white", color = NA))
+fig3_mixer
+
+ggsave(
+    fig3_mixer,
+    #file = here::here("img/main_figs/Fig3_MiXeR_400dpi.tiff"),
+    file = here::here("img/main_figs/Fig3_MiXeR_400dpi.pdf"),
+    #device = 'tiff',
+    device = 'pdf',
+    dpi = 400,
+    width = 22,
+    height = 20,
+    units = "in"
+)
+
+```
+
+### ST7
+
+```{r suppl-table-7, warning=FALSE, error=FALSE, echo=FALSE}
+
+dict_mixer <- dict %>% 
+    dplyr::rename(trait2 = metabolite) %>% 
+    dplyr::select(trait2, prettyName)
+
+mixer_pd2014 <- data.table::fread(here::here("data/mixer/mixer_IPDGC_PD_2014_lift_results.csv")) %>% 
+    dplyr::filter(best_vs_min_AIC != "") 
+
+st7 <- mixer_new %>%
+    full_join(mixer_pd2014) %>% 
+    dplyr::filter(best_vs_min_AIC != "") %>% 
+  dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
+                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
+                trait2 = gsub(".STD.noMHC.Z", "", trait2),
+                trait1 = gsub(".STD.noMHC", "", trait1),
+                trait1 = gsub("PGC_AD_2021_noUKB_no23andMe.nochr19", "AD_wochr19", trait1),
+                trait1 = gsub("IPDGC_PD_2018", "PD", trait1), # change to BT
+                trait1 = gsub("IPDGC_PD_2014_lift", "PD_2014", trait1),
+                ) %>% 
+    dplyr::select(-fname, -`"fname`, -sumstatName, -best_vs_min_BIC, -best_vs_max_BIC, -`pi1 (mean)`, -`pi1 (std)`, -`pi2 (mean)`, -`pi2 (std)`, -`pi12 (mean)`, -`pi12 (std)`, -`dice (mean)`, -`dice (std)`, -`rho_zero (mean)`, -`rho_zero (std)`, -`rho_beta (mean)`, -`rho_beta (std)`, -`best_vs_max_BIC"`) %>% 
+    left_join(dict_mixer) %>% 
+    dplyr::select(-trait2) %>% 
+    dplyr::rename(trait2 = prettyName) %>%
+  dplyr::relocate(trait1, trait2)  %>% 
+    dplyr::filter(trait1 != "PD_2014")
+
+data.table::fwrite(st7, here::here("data/suppl_tables/st7_bivarmixer_metabo.txt"), sep = "\t")
+
+```
+
+### ST8
+
+```{r suppl-table-8,warning=FALSE, error=FALSE, echo=FALSE}
+
+st8 <- mixer_gcg %>%
+    dplyr::filter(best_vs_min_AIC != "") %>% 
+  dplyr::mutate(sumstatName = gsub(".fit.json", "", fname),
+                sumstatName = gsub("/ess/p33/cluster/users/saraes/neurodegen/data/mixer/bi/", "", sumstatName),
+                trait2 = gsub(".STD.noMHC.Z", "", trait2),
+                trait2 = gsub(".STD.noMHC", "", trait2),
+                trait1 = gsub(".STD.noMHC", "", trait1),
+                trait1 = gsub("CARDIOGRAM_CAD_2022", "CAD", trait1),
+                trait1 = gsub("GIANT_BMI_2015_EUR", "BMI", trait1),
+                trait1 = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", trait1),
+                trait1 = gsub("T2DGGI_T2D_2024_EUR.Z", "T2D", trait1),
+                trait1 = gsub("PGC_AD_2021_noUKB_no23andMe.nochr19", "AD_wochr19", trait1),
+                trait1 = gsub("IPDGC_PD_2018", "PD_2018", trait1),
+                trait1 = gsub("NORMENT_PD_2023_Braintyphoon", "PD", trait1),
+                trait1 = factor(trait1, levels = c("BMI", "T2D", "CAD", "Stroke", "PD", "AD_wochr19"))
+                ) %>% 
+    dplyr::select(-fname, -sumstatName, -best_vs_min_BIC, -best_vs_max_BIC, -`pi1 (mean)`, -`pi1 (std)`, -`pi2 (mean)`, -`pi2 (std)`, -`pi12 (mean)`, -`pi12 (std)`, -`dice (mean)`, -`dice (std)`, -`rho_zero (mean)`, -`rho_zero (std)`, -`rho_beta (mean)`, -`rho_beta (std)`) %>% 
+  dplyr::relocate(trait1, trait2)  %>% 
+    dplyr::filter(trait2 != "Glutamine" & trait2 !="GIP" & trait1 != "PD_2018") %>% 
+  dplyr::arrange(trait1)
+
+data.table::fwrite(st8, here::here("data/suppl_tables/st8_bivarmixer_gcg.txt"), sep = "\t")
+```
+
+## MR
+
+### Forest: metabo ~ dx
+
+```{r}
+
+dict <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(exposure = sumstatName) %>%
+    dplyr::select(exposure, prettyName, group, subgroup, groupColor) %>%
+    dplyr::filter(!is.na(exposure))
+
+mr_pd_df <- data.table::fread(here::here("data/MR_exposureMetabo_outcomeDx.txt")) %>%
+    dplyr::filter(outcome == "NORMENT_PD_2023_Braintyphoon.STD") %>%
+    dplyr::mutate(
+        method = gsub("Inverse variance weighted", "IVW", method),
+        outcome = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", outcome)
+    ) %>%
+    dplyr::left_join(dict) %>%
+    dplyr::rename(metabolite = prettyName, disorder = outcome)
+
+mr_ad_df <- data.table::fread(here::here("data/mr/mr_results_exposure_metabo_outcome_dx.csv"))  %>%
+    dplyr::filter(outcome == "PGC_AD_2021_noUKB_no23andMe.STD") %>%
+    dplyr::mutate(
+        method = gsub("Inverse variance weighted", "IVW", method),
+        outcome = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", outcome)
+    ) %>%
+    dplyr::left_join(dict) %>%
+    dplyr::rename(metabolite = prettyName, disorder = outcome)
+
+sig_ad <- mr_ad_df %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>% 
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>% 
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>% 
+    distinct(metabolite, .keep_all = T) %>% 
+    dplyr::select(metabolite, disorder, method, b, se, pval, fdr) 
+
+sig_pd <- mr_pd_df %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>% 
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>% 
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>% 
+    distinct(metabolite, .keep_all = T) %>% 
+    dplyr::select(metabolite, disorder, method, b, se, pval, fdr)
+
+sig_mr_ad_pd <- sig_ad %>% 
+    full_join(sig_pd) 
+
+mr_ad_pd <- mr_ad_df %>% 
+    full_join(mr_pd_df) 
+
+mr_metabo_exp <- mr_ad_pd %>%
+    dplyr::filter(metabolite %in% sig_mr_ad_pd$metabolite) %>% 
+    dplyr::filter(method == "IVW") %>% ## Use MR Egger effect size?
+    dplyr::mutate(CI_lower = (b - 1.96 * se), 
+                  CI_upper = (b + 1.96 * se)) 
+
+ad_order <- mr_metabo_exp %>%
+    dplyr::filter(disorder == "AD") %>% 
+    dplyr::arrange(b) %>%
+    dplyr::pull(metabolite)
+
+metabolite_order <- c("Glutamine", "L-HDL-TG",  "XS-VLDL-PL %", "XL-HDL-CE %")
+mr_metabo_exp$metabolite <- factor(mr_metabo_exp$metabolite, levels = metabolite_order)
+
+forest.mr.metabo <- mr_metabo_exp %>%
+    dplyr::mutate(title = "Metabolite → NDD") %>%
+    ggplot(aes(x = b, y = metabolite, color = disorder)) +
+    geom_vline(xintercept = 0, lty = 1, size = 0.3, color = "black") +
+    geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper), 
+                   height = 0, position = position_dodge(width = 0.6)) +  
+    geom_point(aes(colour = disorder), size = 5, position = position_dodge(width = 0.6)) +  
+    scale_color_manual(name = "", values = c("#1f78b4", "#b2df8a")) +
+    theme_bw() +
+    labs(x = "MR coefficient (95% CI)",
+         y = "Exposure") +
+    theme(panel.grid = element_blank(),
+          legend.position = "right", 
+          legend.direction = "vertical",
+          legend.title = element_blank(),
+          legend.text = element_text(size = 20, colour = "black"),
+          strip.text.x = element_text(colour = "black", size = 20),
+          strip.text.y = element_blank(),
+          strip.background = element_blank(),
+          axis.text = element_text(size = 20, colour = "black"),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(r = 15))) +
+    facet_grid( ~ title, scales = "free_y", switch = "y", space = "free_y")
+forest.mr.metabo
+
+```
+
+### Forest: dx ~ metabo
+
+```{r mr-dx-metabo}
+
+dict_mr_dx_exp <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(outcome = sumstatName) %>%
+    dplyr::select(outcome, prettyName)
+
+mr_pd_exp <- data.table::fread(here::here("data/MR_exposureDx_outcomeMetabo.txt")) %>% 
+     dplyr::filter(exposure == "NORMENT_PD_2023_Braintyphoon.STD") %>% 
+    dplyr::mutate(exposure = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", exposure),
+                  fdr = p.adjust(pval, method = "fdr")) %>%
+    dplyr::left_join(dict_mr_dx_exp) %>% 
+    dplyr::rename(metabolite = prettyName,
+                  disorder = exposure)
+    
+mr_ad_exp <- data.table::fread(here::here("data/mr/mr_results_exposure_dx_outcome_metabo.csv")) %>% 
+    dplyr::filter(exposure == "PGC_AD_2021_noUKB_no23andMe.STD") %>% 
+    dplyr::mutate(exposure = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", exposure),
+                  fdr = p.adjust(pval, method = "fdr")) %>%
+    dplyr::left_join(dict_mr_dx_exp) %>% 
+    dplyr::rename(metabolite = prettyName,
+                  disorder = exposure)
+
+mr_dx_exp <- mr_ad_exp %>% 
+    full_join(mr_pd_exp)
+
+sig_ad_exp_all <- mr_ad_exp %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr"),
+                  method = gsub("Inverse variance weighted", "IVW", method)) %>%
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>%
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>%
+    distinct(metabolite, .keep_all = T) %>%
+    dplyr::select(metabolite, disorder, method, b, se, pval, fdr) ## 179
+
+sig_ad_exp <- sig_ad_exp_all %>%
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(fdr < 0.00007)) %>%
+    dplyr::ungroup() %>%
+    dplyr::select(metabolite, disorder, method, b, se, pval, fdr) %>%
+    dplyr::distinct(metabolite, .keep_all = TRUE)  #179 - 47 in the plot
+
+sig_pd_exp_all <- mr_pd_exp %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr"),
+                  method = gsub("Inverse variance weighted", "IVW", method)) %>%
+    dplyr::filter(
+                 (method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>%
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>%
+    distinct(metabolite, .keep_all = T) %>%
+    dplyr::select(metabolite, disorder, method, b, se, pval, fdr)
+
+sig_mr_dx <- sig_ad_exp %>% 
+    full_join(sig_ad_exp) 
+
+mr_dx_exp_df <- mr_dx_exp %>%
+    dplyr::filter(metabolite %in% sig_mr_dx$metabolite) %>%
+    dplyr::mutate(CI_lower = (b - 1.96 * se), 
+                  CI_upper = (b + 1.96 * se),
+                  method = gsub("Inverse variance weighted", "IVW", method)) %>% 
+    dplyr::filter(method == "IVW") # IVW
+
+forest.mr.dx <- mr_dx_exp_df %>%
+    dplyr::mutate(title = "NDD → Metabolite") %>%
+    ggplot(aes(x = b, y = reorder(metabolite, b)), colour = disorder) +
+    geom_vline(xintercept = 0, lty = 1, size = 0.3, color = "black") +
+    geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper, colour = disorder), 
+                   height = 0, position = position_dodge(width = 0.4)) +  # Keep error bars centered
+    geom_point(aes(colour = disorder), size = 5, position = position_dodge(width = 0.4)) +  # Adjust nudge if needed
+    scale_x_continuous(limits = c(-0.4, 0.4), breaks = c(-0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4)) +  
+    scale_color_manual(name = "", values = c("#1f78b4", "#b2df8a")) +
+    theme_bw() +
+    labs(x = "MR coefficient (95% CI)",
+         y = "Outcome") +
+    theme(panel.grid = element_blank(),
+          legend.position = "none", 
+          legend.direction = "vertical",
+          legend.title = element_blank(),
+          legend.text = element_text(size = 20, colour = "black"),
+          strip.text.x = element_text(colour = "black", size = 20),
+          strip.text.y = element_blank(),
+          strip.background = element_blank(),
+          axis.text = element_text(size = 20, colour = "black"),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(r = 15))) +
+    facet_grid( ~ title, scales = "free_y", switch = "y", space = "free_y")
+forest.mr.dx
+
+```
+
+### Tile
+
+```{r mr-tile}
+
+dict <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(exposure = sumstatName) %>%
+    dplyr::select(exposure, prettyName, group, subgroup, groupColor) %>% 
+    dplyr::filter(!is.na(exposure)) 
+
+mr_df <- data.table::fread(here::here("data/mr/MR__exposure_metabolite_outcome_smd.csv")) %>% 
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method))
+
+mr_cmd <- mr_df %>% 
+    dplyr::filter(outcome != "EADB_AD_2022_metadata.STD" & outcome != "MEGAVCID_VaD_2024.STD"  & outcome !="IPDGC_PD_2014_lift.STD"
+                  ) %>% 
+    dplyr::mutate(outcome = gsub("GIANT_BMI_2015_EUR.STD", "BMI", outcome),
+                  outcome = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", outcome),
+                  outcome = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", outcome),
+                  outcome = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", outcome),
+                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", outcome),
+                  outcome = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", outcome), ## change
+                  outcome = gsub("IPDGC_PD_2018.STD", "PD_2018", outcome), ## change
+                  outcome = gsub("IPDGC_PD_2018.STD", "PD_2014", outcome), ## change
+                  fdr = p.adjust(pval, method = "fdr")) %>%
+    dplyr::left_join(dict) %>% 
+    dplyr::rename(metabolite = prettyName,
+                  disorder = outcome)
+
+sig_BMI <- mr_cmd %>%
+    dplyr::filter(disorder == "BMI") %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>% 
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>% 
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>% 
+    distinct(metabolite, .keep_all = T) %>% 
+    dplyr::select(metabolite, disorder, method, b, pval, fdr)  #14
+
+sig_CAD <- mr_cmd %>%
+    dplyr::filter(disorder == "CAD") %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>% 
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>% 
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>% 
+    distinct(metabolite, .keep_all = T) %>% 
+    dplyr::select(metabolite, disorder, method, b, pval, fdr)  # 180
+
+sig_T2D <- mr_cmd %>%
+    dplyr::filter(disorder == "T2D") %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>% 
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>% 
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>% 
+    distinct(metabolite, .keep_all = T) %>% 
+    dplyr::select(metabolite, disorder, method, b, pval, fdr)  #95
+
+sig_Stroke <- mr_cmd %>%
+    dplyr::filter(disorder == "Stroke") %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>% 
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>% 
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>% 
+    distinct(metabolite, .keep_all = T) %>% 
+    dplyr::select(metabolite, disorder, method, b, pval, fdr)  #0
+
+sig_AD <- mr_cmd %>%
+    dplyr::filter(disorder == "AD") %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>% 
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>% 
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>% 
+    distinct(metabolite, .keep_all = T) %>% 
+    dplyr::select(metabolite, disorder, method, b, pval, fdr) #4
+
+sig_PD <- mr_cmd %>%
+    dplyr::filter(disorder == "PD") %>%
+    dplyr::mutate(fdr = p.adjust(pval, method = "fdr")) %>% 
+    dplyr::filter((method %in% c("IVW", "Weighted median") & fdr < 0.05) |
+                  (method == "MR Egger" & pval < 0.05)) %>% 
+    dplyr::group_by(metabolite) %>%
+    dplyr::filter(all(c("IVW", "MR Egger", "Weighted median") %in% method)) %>%
+    dplyr::ungroup()  %>% 
+    distinct(metabolite, .keep_all = T) %>% 
+    dplyr::select(metabolite, disorder, method, b, pval, fdr) #0
+
+sig_metabo <- sig_BMI %>% 
+    full_join(sig_T2D) %>%
+    full_join(sig_CAD) %>%
+    full_join(sig_Stroke) %>% 
+    full_join(sig_AD) %>% 
+    full_join(sig_PD) %>%
+    dplyr::filter(metabolite %in% sig_AD$metabolite | metabolite %in% sig_PD$metabolite)
+
+mr_tile <- mr_cmd %>% 
+    dplyr::filter(metabolite %in% sig_metabo$metabolite) %>% 
+    mutate(significance = case_when(
+      pval < 0.05 & fdr >= 0.05 ~ "P<0.05",
+      fdr < 0.05 ~ "FDR<5%",
+      TRUE ~ "Not Significant"
+    )) %>% 
+    dplyr::filter(method == "IVW" & disorder != "PD_2018") 
+
+wide_matrix <- mr_tile %>%
+  dplyr::select(metabolite, disorder, b) %>%
+  spread(key = disorder, value = b, fill = 0)  
+
+metabolite_order <- c("Glutamine", "L-HDL-TG",  "XS-VLDL-PL %", "XL-HDL-CE %")
+mr_tile$metabolite <- factor(mr_tile$metabolite, levels = metabolite_order)
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+mr_tile$disorder <- factor(mr_tile$disorder, levels = trait_order)
+
+mr_div_plot <- mr_tile %>% 
+    dplyr::mutate(title = "Metabolite → Trait") %>%
+    ggplot(aes(x = disorder, y = metabolite, fill = b)) +
+    geom_tile(color = "white") +  
+    scale_fill_gradient2(low = "blue", mid = "white", high = "orange", midpoint = 0) + 
+    geom_point(data = mr_tile  %>% filter(significance == "FDR<5%"),
+             aes(x = disorder, y = metabolite, shape = "FDR<5%", color = "FDR<5%"), 
+              fill = "black", size = 2, stroke = 0.5) +
+  geom_point(data = mr_tile  %>% filter(significance == "P<0.05" & fdr >= 0.05),
+             aes(x = disorder, y = metabolite, shape = "P<0.05", color = "P<0.05"),  
+            fill = "transparent", size = 2, stroke = 0.5) + 
+  scale_shape_manual(values = c("FDR<5%" = 21, "P<0.05" = 21), name = "IVW sig") +
+    scale_color_manual(values = c("FDR<5%" = "black", "P<0.05" = "grey20"),
+                     name = "IVW sig") +
+    labs(x = "Outcome", y = "Exposure", fill = "MR coef") +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 20, colour = "black"),  
+        axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 20, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.text.x = element_text(colour = "black", size = 20),
+        strip.text.y = element_blank(),
+        strip.background = element_blank(),
+        legend.text = element_text(size = 20, colour = "black"), 
+        legend.title = element_text(size = 20, colour = "black"))  +
+    facet_grid( ~ title)
+mr_div_plot 
+
+```
+### Fig4
+
+```{r Fig4}
+
+combined_mr_tile_plot <- ggpubr::ggarrange(forest.mr.metabo, 
+                                  mr_div_plot, 
+                                  ncol=1, 
+                                  nrow=2,
+                                  labels = c("a", "c"),
+                                  font.label = list(size = 20),
+                                  heights = c(1, 1.4),
+                                  common.legend = FALSE
+                                  )
+combined_mr_tile_plot
+
+mr_plot <- ggpubr::ggarrange(
+    combined_mr_tile_plot,
+    forest.mr.dx,
+    ncol = 2,
+    nrow = 1,
+    labels = c("", "b"),
+    font.label = list(size = 20),
+    common.legend = F
+)
+mr_plot
+
+ggsave(
+    here::here("img/main_figs/Fig4_causal_pathways.tiff"),
+    #here::here("img/main_figs/Fig4_causal_pathways.pdf"),
+    plot = mr_plot,
+    device = 'tiff',
+    #device = 'pdf',
+    dpi = 400,
+    width = 20,
+    height = 14,
+    units = "in",
+    bg = "white"
+)
+
+```
+
+### Suppl Fig6
+Metabo -> NDD
+
+```{r}
+
+dict <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(exposure = sumstatName) %>%
+    dplyr::select(exposure, prettyName, group, subgroup, groupColor) %>% 
+    dplyr::mutate(newColor = randomized_colors[match(group, unique(group))]) %>% 
+    dplyr::filter(!is.na(exposure))
+
+mr_pd <- data.table::fread(here::here("data/MR_exposureMetabo_outcomeDx.txt")) %>% 
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method)) %>% 
+    dplyr::filter(outcome == "NORMENT_PD_2023_Braintyphoon.STD") %>% ## change
+    dplyr::filter(method %in% c("IVW", "Weighted median", "MR Egger")) %>%
+    dplyr::filter(pval < 0.10) %>%
+    dplyr::group_by(exposure) %>%
+    dplyr::filter(n() == 3) %>%   
+    dplyr::mutate(disorder = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", outcome), 
+                  CI_lower = (b - 1.96 * se),
+                  CI_upper = (b + 1.96 * se)) %>%
+    dplyr::left_join(dict) %>% 
+        dplyr::mutate(group = gsub("Glycolysis related metabolites", "Glycolysis", group),
+                      group = gsub("Relative lipoprotein lipid concentrations", "Rel lipoprotein lipid conc", group),
+                      group = gsub("Lipoprotein particle concentrations", "Lipoprotein particle conc", group),
+        ) %>%
+    dplyr::mutate(title = "Metabolite → PD",
+                  Category = group) 
+mr_pd
+
+mr_df <- data.table::fread(here::here("data/mr/mr_results_exposure_metabo_outcome_dx.csv")) %>% 
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method))
+
+mr_ad <- mr_df %>%
+    dplyr::filter(outcome == "PGC_AD_2021_noUKB_no23andMe.STD") %>%
+    dplyr::filter(method %in% c("IVW", "Weighted median", "MR Egger")) %>%
+    dplyr::filter(pval < 0.05) %>%
+    dplyr::group_by(exposure) %>%
+    dplyr::filter(n() == 3) %>%   # Keep only exposures with p < 0.05 in all 3 methods
+    dplyr::mutate(disorder = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", outcome),
+                  CI_lower = (b - 1.96 * se),
+                  CI_upper = (b + 1.96 * se)) %>%
+    dplyr::left_join(dict) %>% 
+        dplyr::mutate(group = gsub("Glycolysis related metabolites", "Glycolysis", group),
+                      group = gsub("Relative lipoprotein lipid concentrations", "Rel lipoprotein lipid conc", group),
+                      group = gsub("Lipoprotein particle concentrations", "Lipoprotein particle conc", group),
+        ) %>%
+    dplyr::mutate(title = "Metabolite → AD",
+                  Category = group)
+
+mr_adpd <- full_join(mr_ad, mr_pd)
+
+forest.mr.adpd <- mr_adpd %>%
+    ggplot(aes(x = b, y = reorder(prettyName, b), color = Category, shape = method)) +
+    geom_vline(xintercept = 0, lty = 1, size = 0.3, color = "black") +
+    geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper),
+                   height = 0,
+                   position = position_dodge(width = 0.5)) +
+    geom_point(size = 4,
+               position = position_dodge(width = 0.5)) +
+    scale_color_manual(values = setNames(mr_adpd$newColor, mr_adpd$group), drop = FALSE, name = "Metabolite category") +
+    scale_shape_discrete(name = "MR method") +  # Change legend title for shape
+    theme_bw() +
+    labs(x = "MR coefficient (95% CI)",
+         y = "Exposure") +
+    theme(panel.grid = element_blank(),
+          legend.position = "bottom",
+          legend.direction = "vertical",
+          legend.title = element_text(size = 20),
+          legend.text = element_text(size = 20, colour = "black"),
+          strip.text.x = element_text(colour = "black", size = 20),
+          strip.text.y = element_blank(),
+          strip.background = element_blank(),
+          axis.text = element_text(size = 20, colour = "black"),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(r = 15))) +
+    facet_wrap(~ title, ncol = 2, nrow=1, scales = "free_y", strip.position = "top")
+forest.mr.adpd
+
+ggsave(
+    here::here("img/suppl_figs/SupplFig6_mr_metabo_dx.tiff"),
+    plot = forest.mr.adpd,
+    width = 12,
+    height = 6,
+    device = 'tiff',
+    dpi = 400,
+    bg = "white"
+)
+
+```
+
+### Suppl Fig7
+NDD -> Metabo
+
+```{r}
+
+dict <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(outcome = sumstatName) %>%
+    dplyr::select(outcome, prettyName, group, subgroup, groupColor) %>% 
+    dplyr::mutate(newColor = randomized_colors[match(group, unique(group))]) %>% 
+    dplyr::filter(!is.na(outcome)) 
+
+mr_ad_exp <- data.table::fread(here::here("data/mr/mr_results_exposure_dx_outcome_metabo.csv")) %>% 
+    dplyr::filter(exposure == "PGC_AD_2021_noUKB_no23andMe.STD") %>% 
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method)) 
+
+mr_pd_exp <- data.table::fread(here::here("data/MR_exposureDx_outcomeMetabo.txt"))  %>% 
+    dplyr::filter(exposure == "NORMENT_PD_2023_Braintyphoon.STD") %>% 
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method)) 
+
+mr_df <- full_join(mr_ad_exp, mr_pd_exp)  
+
+dx_expo_sig <- mr_df %>%
+  dplyr::mutate(pval_fdr = p.adjust(pval, method = "fdr")) %>% 
+    group_by(exposure, outcome) %>%
+  filter(
+    any(method == "IVW" & pval_fdr < 0.05),
+    any(method == "Weighted median" & pval_fdr < 0.05),
+    any(method == "MR Egger" & pval_fdr < 0.05)
+  ) %>%
+  ungroup()  
+
+mr_dx_expo <- mr_df %>%
+    dplyr::filter(exposure == "PGC_AD_2021_noUKB_no23andMe.STD" | exposure == "NORMENT_PD_2023_Braintyphoon.STD") %>%
+    dplyr::filter(outcome %in% dx_expo_sig$outcome) %>% 
+    dplyr::mutate(disorder = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD → Metabolite", exposure),
+                  disorder = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD → Metabolite", disorder),
+                  CI_lower = (b - 1.96 * se),
+                  CI_upper = (b + 1.96 * se)) %>%
+        dplyr::filter(method  == "IVW") %>% 
+    dplyr::left_join(dict) %>% 
+        dplyr::mutate(group = gsub("Glycolysis related metabolites", "Glycolysis", group),
+                      group = gsub("Relative lipoprotein lipid concentrations", "Rel lipoprotein lipid conc", group),
+                      group = gsub("Lipoprotein particle concentrations", "Lipoprotein particle conc", group),
+        )
+
+dodge <- position_dodge(width = 0.5)
+
+forest.dx.expo <- mr_dx_expo %>%
+    dplyr::mutate(Category = group) %>%
+    ggplot(aes(x = b, y = reorder(Category, b), color = Category, shape = method, group = outcome)) +
+    geom_vline(xintercept = 0, lty = 1, size = 0.3, color = "black") +
+   geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper),
+                   height = 0,
+                  color = "grey50",
+                  linetype = "dashed",
+                  size = 0.25,
+                 position = dodge) +
+  geom_point(size = 4, position = dodge) +
+    scale_color_manual(values = setNames(mr_dx_expo$newColor, mr_dx_expo$group), drop = FALSE, name = "Metabolite category") +
+    scale_shape_discrete(name = "MR method") + 
+    scale_x_continuous(limits = c(-0.5, 0.5), breaks = c(-0.5, -0.25, 0, 0.25, 0.5)) +  
+    theme_bw() +
+    labs(x = "MR IVW coefficient (95% CI)",
+         y = "Exposure") +
+    theme(panel.grid = element_blank(),
+          legend.position = "none",
+          legend.direction = "vertical",
+          legend.title = element_text(size = 20),
+          legend.text = element_text(size = 20, colour = "black"),
+          strip.text.x = element_text(colour = "black", size = 20),
+          strip.text.y = element_blank(),
+          strip.background = element_blank(),
+          axis.text = element_text(size = 20, colour = "black"),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(r = 15))) +
+    facet_grid(Category ~ disorder, scales = "free_y", switch = "y", space = "free_y")
+forest.dx.expo
+
+ggsave(
+    here::here("img/suppl_figs/SupplFig7_mr_dx_metabo.tiff"),
+    plot = forest.dx.expo,
+    width = 12,
+    height = 12,
+    device = 'tiff',
+    dpi = 400,
+    bg = "white"
+)
+
+```
+
+### ST9
+
+```{r suppl-table-9}
+
+dict_mr <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(exposure = sumstatName) %>%
+    dplyr::select(exposure, prettyName) %>% 
+    dplyr::filter(!is.na(exposure)) 
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+
+mr_metabo_dx <- data.table::fread(here::here("data/mr/MR__exposure_metabolite_outcome_smd.csv")) %>% 
+    dplyr::left_join(dict_mr) %>% 
+    dplyr::filter(outcome != "EADB_AD_2022_metadata.STD" & outcome != "MEGAVCID_VaD_2024.STD") %>% 
+    dplyr::mutate(outcome = gsub(".STD", "", outcome),
+                  outcome = gsub("GIANT_BMI_2015_EUR", "BMI", outcome),
+                  outcome = gsub("T2DGGI_T2D_2024_EUR", "T2D", outcome),
+                  outcome = gsub("CARDIOGRAM_CAD_2022", "CAD", outcome), 
+                  outcome = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", outcome),
+                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", outcome),
+                  outcome = gsub("IPDGC_PD_2014_lift", "PD_2014", outcome),
+                  outcome = gsub("IPDGC_PD_2018", "PD_2018", outcome),
+                  outcome = gsub("NORMENT_PD_2023_Braintyphoon", "PD", outcome), 
+                  method = gsub("Inverse variance weighted", "IVW", method)
+                  ) %>% 
+    dplyr::filter(outcome != "PD_2014" & outcome != "PD_2018") %>% 
+    dplyr::select(-exposure) %>% 
+    dplyr::rename(p = pval,
+                  p_adj = pval_adjusted, 
+                  exposure = prettyName) %>% 
+    dplyr::select(exposure, outcome, method, nsnp, b, se, p, p_adj)
+
+mr_metabo_dx$outcome <- factor(mr_metabo_dx$outcome, levels = trait_order)
+mr_metabo_dx <- mr_metabo_dx %>% dplyr::arrange(exposure, outcome)
+
+dict_mr <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(outcome = sumstatName) %>%
+    dplyr::select(outcome, prettyName) %>% 
+    dplyr::filter(!is.na(outcome)) 
+
+mr_dx_metabo <- data.table::fread(here::here("data/mr/MR__exposure_smd_outcome_metabolite.csv")) %>% 
+    dplyr::left_join(dict_mr) %>% 
+    dplyr::filter(exposure != "EADB_AD_2022_metadata.STD" & exposure != "MEGAVCID_VaD_2024.STD") %>% 
+    dplyr::mutate(exposure = gsub(".STD", "", exposure),
+                  exposure = gsub("GIANT_BMI_2015_EUR", "BMI", exposure),
+                  exposure = gsub("T2DGGI_T2D_2024_EUR", "T2D", exposure),
+                  exposure = gsub("CARDIOGRAM_CAD_2022", "CAD", exposure), 
+                  exposure = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", exposure),
+                  exposure = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", exposure),
+                  exposure = gsub("IPDGC_PD_2014_lift", "PD_2014", exposure),
+                  exposure = gsub("IPDGC_PD_2018", "PD_2018", exposure),
+                  exposure = gsub("NORMENT_PD_2023_Braintyphoon", "PD", exposure),
+                  method = gsub("Inverse variance weighted", "IVW", method)
+                  ) %>% 
+    dplyr::filter(exposure != "PD_2014" & exposure != "PD_2018") %>% 
+    dplyr::select(-outcome) %>% 
+    dplyr::rename(p = pval,
+                  p_adj = pval_adjusted, 
+                  outcome = prettyName) %>% 
+    dplyr::select(exposure, outcome, method, nsnp, b, se, p, p_adj)
+
+mr_dx_metabo$exposure <- factor(mr_dx_metabo$exposure, levels = trait_order)
+mr_dx_metabo <- mr_dx_metabo %>% dplyr::arrange(outcome, exposure)
+
+st9 <- full_join(mr_metabo_dx, mr_dx_metabo)
+data.table::fwrite(st9, here::here("data/suppl_tables/st9_bi_mr_metabo_dx.txt"), sep = "\t")
+
+```
+
+### ST10
+GCG <--> Dx
+
+```{r suppl-table-10}
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+mr_gcg_dx <- data.table::fread(here::here("data/mr/MR__exposure_dx_outcome_GCG.csv")) %>% 
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method),
+                  outcome = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", outcome),
+                  outcome = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", outcome),
+                  outcome = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", outcome),
+                  outcome = gsub("GIANT_BMI_2015_EUR.STD", "BMI", outcome),
+                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", outcome),
+                  outcome = gsub("IPDGC_PD_2014_lift.STD", "PD_2014", outcome),
+                  outcome = gsub("IPDGC_PD_2018.STD", "PD_2018", outcome), 
+                  outcome = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", outcome), 
+                  fdr = p.adjust(pval, method = "fdr")) %>% 
+     dplyr::mutate(CI_lower = (b - 1.96 * se),
+                  CI_upper = (b + 1.96 * se)) %>% 
+    dplyr::filter(outcome != "PD_2014" & outcome != "PD_2018") %>% 
+    dplyr::rename(p = pval,
+                  p_adj = pval_adjusted) %>% 
+    dplyr::select(exposure, outcome, method, nsnp, b, se, p, p_adj)
+mr_gcg_dx$outcome <- factor(mr_gcg_dx$outcome, levels = trait_order)
+mr_gcg_dx <- mr_gcg_dx %>% dplyr::arrange(outcome, exposure)
+
+mr_dx_gcg <- data.table::fread(here::here("data/mr/MR__exposure_GCG_outcome_dx.csv")) %>%
+    dplyr::mutate(method = gsub("Inverse variance weighted", "IVW", method),
+                  exposure = gsub("T2DGGI_T2D_2024_EUR.STD", "T2D", exposure),
+                  exposure = gsub("CARDIOGRAM_CAD_2022.STD", "CAD", exposure),
+                  exposure = gsub("MEGASTROKE_STROKE_2022_AS.STD", "Stroke", exposure),
+                  exposure = gsub("GIANT_BMI_2015_EUR.STD", "BMI", exposure),
+                  exposure = gsub("PGC_AD_2021_noUKB_no23andMe.STD", "AD", exposure),
+                  exposure = gsub("IPDGC_PD_2014_lift.STD", "PD_2014", exposure),
+                  exposure = gsub("IPDGC_PD_2018.STD", "PD_2018", exposure), 
+                  exposure = gsub("NORMENT_PD_2023_Braintyphoon.STD", "PD", exposure), 
+                  fdr = p.adjust(pval, method = "fdr")) %>% 
+     dplyr::mutate(CI_lower = (b - 1.96 * se),
+                  CI_upper = (b + 1.96 * se)) %>% 
+    dplyr::filter(exposure != "PD_2014" & exposure != "PD_2018") %>% 
+    dplyr::rename(p = pval,
+                  p_adj = pval_adjusted) %>% 
+    dplyr::select(exposure, outcome, method, nsnp, b, se, p, p_adj)
+mr_dx_gcg$exposure <- factor(mr_dx_gcg$exposure, levels = trait_order)
+mr_dx_gcg <- mr_dx_gcg %>% dplyr::arrange(outcome, exposure)
+
+st10 <- full_join(mr_gcg_dx, mr_dx_gcg)
+data.table::fwrite(st10, here::here("data/suppl_tables/st10_bi_mr_gcg_dx.txt"), sep = "\t")
+
+```
+
+### ST11
+
+```{r}
+
+trait_order <- c("BMI", "T2D", "CAD", "Stroke", "PD", "AD")
+
+st11 <- data.table::fread(here::here("data/mr/MR__exposure_dx_outcome_trait.csv")) %>%
+    dplyr::mutate(exposure = gsub(".STD", "", exposure),
+                  exposure = gsub("GIANT_BMI_2015_EUR", "BMI", exposure),
+                  exposure = gsub("T2DGGI_T2D_2024_EUR", "T2D", exposure),
+                  exposure = gsub("CARDIOGRAM_CAD_2022", "CAD", exposure), 
+                  exposure = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", exposure),
+                  exposure = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", exposure),
+                  exposure = gsub("IPDGC_PD_2014_lift", "PD_2014", exposure),
+                  exposure = gsub("IPDGC_PD_2018", "PD_2018", exposure),
+                  exposure = gsub("NORMENT_PD_2023_Braintyphoon", "PD", exposure),
+                  outcome = gsub("GIANT_BMI_2015_EUR", "BMI", outcome),
+                  outcome = gsub("T2DGGI_T2D_2024_EUR", "T2D", outcome),
+                  outcome = gsub("CARDIOGRAM_CAD_2022", "CAD", outcome), 
+                  outcome = gsub("MEGASTROKE_STROKE_2022_AS", "Stroke", outcome),
+                  outcome = gsub("PGC_AD_2021_noUKB_no23andMe", "AD", outcome),
+                  outcome = gsub("IPDGC_PD_2014_lift", "PD_2014", outcome),
+                  outcome = gsub("IPDGC_PD_2018", "PD_2018", outcome),
+                  outcome = gsub("NORMENT_PD_2023_Braintyphoon", "PD", outcome),
+                  method = gsub("Inverse variance weighted", "IVW", method)
+                  ) %>%
+    dplyr::filter(exposure != "PD_2014" & outcome != "PD_2014",
+                  exposure != "PD_2018" & outcome != "PD_2018") %>%
+    dplyr::filter(!(exposure == "BMI" & outcome == "BMI"),
+           !(exposure == "T2D" & outcome == "T2D"),
+           !(exposure == "CAD" & outcome == "CAD"),
+           !(exposure == "Stroke" & outcome == "Stroke"),
+           !(exposure == "AD" & outcome == "AD"),
+           !(exposure == "PD" & outcome == "PD"), 
+           ) %>% 
+    dplyr::rename(p = pval,
+                  p_adj = pval_adjusted) %>%
+    dplyr::select(exposure, outcome, method, nsnp, b, se, p, p_adj)
+
+st11$exposure <- factor(st11$exposure, levels = trait_order)
+st11$outcome <- factor(st11$outcome, levels = trait_order)
+st11 <- st11 %>% dplyr::arrange(exposure, outcome)
+data.table::fwrite(st11, here::here("data/suppl_tables/st11_bw_dx.txt"), sep = "\t")
+
+```
+
+## gsa-MiXeR
+
+### ST12
+
+```{r suppl-table-12}
+
+st12 <- data.table::fread(here::here("data/gsa-mixer/st12_GCG_magma.gsa.out.txt")) %>% 
+    dplyr::rename(variable = VARIABLE,
+                  type = TYPE,
+                  ngenes = NGENES,
+                  beta = BETA,
+                  beta_std = BETA_STD,
+                  se = SE,
+                  p = P,
+                  full_name = FULL_NAME)
+
+data.table::fwrite(st12, here::here("data/suppl_tables/st12_gsa-mixer_gcg.txt"), sep = "\t")
+
+```
+
+## conjFDR
+
+### manhattan
+
+```{r ad-gcg}
+
+library(tidyverse)
+
+GCG <- data.table::fread(here::here("data/pleiofdr/AD_GCG_result.mat.csv"))
+
+GCG_loci <- data.table::fread(here::here("data/pleiofdr/PGC_AD_2021_noUKB_no23andMe_GCG_conjfdr_0.05_loci.csv")) %>%
+    dplyr::select(chrnum, chrpos)  %>%
+    dplyr::rename(chr = chrnum,
+                  bp = chrpos)
+
+GCG_df <- GCG %>%
+    dplyr::rename(
+        P = FDR
+    )
+
+data_cum <- GCG_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    group_by(chr) %>%
+    summarise(max_bp = max(bp)) %>%
+    mutate(bp_add = lag(cumsum(max_bp), default = 0)) %>%
+    dplyr::select(chr, bp_add)
+
+gwas_data <- GCG_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    inner_join(data_cum, by = "chr") %>%
+    mutate(bp_cum = bp + bp_add)
+
+axis_set <- gwas_data %>%
+    group_by(chr) %>%
+    summarize(center = mean(bp_cum))
+
+ylim <- gwas_data %>%
+    dplyr::rename(p = P) %>%
+    dplyr::filter(p == min(p)) %>%
+    dplyr::mutate(ylim = abs(floor(log10(p))) + 2) %>%
+    pull(ylim)
+
+sig <- 0.05
+
+glut_loci <- left_join(GCG_loci, gwas_data) %>%
+    dplyr::rename(label = SNP)
+
+manhplot_glut_df <- gwas_data %>%
+    left_join(glut_loci) %>%
+    dplyr::mutate(label = case_when(label == "rs7412" ~ "APOE", 
+                             label == "rs3826688" ~ "APOC1", 
+                             label == "rs2452170" ~ "MAMSTR",
+    )) %>%
+    dplyr::rename(p = P) %>%
+    dplyr::mutate(title = "AD | GCG")
+
+gcg_ad_manhplot <- manhplot_glut_df %>%
+    ggplot(aes(x = bp_cum, y = -log10(p))) +
+    geom_hline(yintercept = -log10(sig), color = "grey25", linetype = "dashed", lwd = 0.5) +
+    geom_point(size = 1.5, colour = "#1f78b4") +
+    geom_point(
+        data = manhplot_glut_df %>% filter(!is.na(label)),
+        shape = 21, size = 4, color = "black", fill = "#1f78b4") +
+    scale_x_continuous(expand = c(.01,.01), label = axis_set$chr, breaks = axis_set$center) +
+    scale_y_continuous(expand = c(.02,.02), limits = c(0, 8), breaks = c(0,2,4,6,8)) +
+    labs(x = "Chromosome",
+         y = expression(paste('-log'[10],'(', 'conjFDR',')'))) +
+    ggrepel::geom_label_repel(aes(label = label),
+                             fontface = "italic",  # Italic text
+                             color = "grey25",     # Set font color
+                             box.padding = 0.2,    # Space around text
+                             point.padding = 0.2,  # Space between point and label
+                             segment.size = 0.3,   # Line connecting label to point
+                             label.padding = 0.1,  # Padding inside the label
+                             label.size = 0,       # Remove border around label
+                             fill = "transparent",
+                             nudge_y = 0.5,
+                             size = 6.5
+                             ) +
+    theme_minimal() +
+    theme(
+        panel.background = element_rect(fill = "white", colour = "white"),
+        plot.background = element_rect(fill = "white", colour = "white"),
+        legend.background = element_rect(fill = "white", colour = "white"),
+        legend.key = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        axis.line.x = element_line(color = "black", size = 0.6),
+        axis.line.y = element_line(color = "black", size = 0.6),  # Ensure y-axis is also visible
+        legend.position = "none",
+        axis.text = element_text(size = 20, colour = "black"),
+        axis.title.x = element_text(size = 20,  colour = "black",  margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 20,  colour = "black",  margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.text.x = element_text(colour = "black", size = 20, face = "bold"),
+        strip.text.y = element_text(colour = "black", size = 20, face = "bold"),
+        strip.background.x = element_rect(colour = "transparent", fill = "transparent"),
+        strip.background.y = element_rect(colour = "transparent", fill = "transparent"),
+        strip.placement.y = "bottom"
+    ) +
+    facet_wrap(~title)
+
+ggplot2::ggsave(
+    filename = "SupplFig_manhattan_cFDR_AD_gcg.png",
+    plot = gcg_ad_manhplot,
+    path = here::here("img/suppl_figs/"),
+    width = 18,
+    height = 10,
+    device = "png",
+    dpi = 300,
+    type = "cairo"
+)
+```
+
+### ST13
+
+AD ~ metabo
+
+```{r suppl-table-13}
+
+dict_conjfdr <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(metabolite = sumstatName) %>%
+    dplyr::select(metabolite, prettyName) %>% 
+    dplyr::filter(!is.na(metabolite)) 
+
+st13 <- data.table::fread(here::here("data/opentargets/PGC_AD_2021_noUKB_no23andMe_cFDR_aggregate_OT_long.txt")) %>% 
+    dplyr::mutate(disorder = "AD") %>% 
+    left_join(dict_conjfdr) %>% 
+    dplyr::select(-metabolite) %>% 
+    dplyr::rename(metabolite = prettyName) %>% 
+    dplyr::select(disorder, metabolite, locusnum, SNP, chrnum, chrpos, pval_Dx, fdr_Dx, conjfdr, Gene) 
+
+data.table::fwrite(st13, here::here("data/suppl_tables/st13_conjfdr_ad_metabo.txt"), sep = "\t")
+
+```
+
+### ST14
+
+PD ~ metabo
+
+```{r suppl-table-14}
+
+dict_conjfdr <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(metabolite = sumstatName) %>%
+    dplyr::select(metabolite, prettyName) %>% 
+    dplyr::filter(!is.na(metabolite)) 
+
+st14 <- data.table::fread(here::here("data/opentargets/NORMENT_PD_2023_Braintyphoon_cFDR_aggregate_OT_long.txt")) %>% 
+    dplyr::mutate(disorder = "PD") %>%
+    left_join(dict_conjfdr) %>% 
+    dplyr::select(-metabolite) %>% 
+    dplyr::rename(metabolite = prettyName) %>% 
+    dplyr::select(disorder, metabolite, locusnum, SNP, chrnum, chrpos, pval_Dx, fdr_Dx, conjfdr, Gene) 
+
+data.table::fwrite(st14, here::here("data/suppl_tables/st14_conjfdr_pd_metabo.txt"), sep = "\t")
+
+```
+
+### ST15
+
+NDD ~ GCG
+
+```{r suppl-table-15, echo=FALSE}
+
+ad_gcg_conjfdr <- data.table::fread(here::here("data/opentargets/PGC_AD_2021_noUKB_no23andMe_cFDR_aggregate_OT_long_GCG.txt")) %>% 
+    dplyr::mutate(trait1 = "AD", trait2 = "GCG") %>% 
+    dplyr::select(trait1, trait2, locusnum, SNP, chrnum, chrpos, pval_Dx, fdr_Dx, conjfdr, Gene) 
+pd_gcg_conjfdr <- data.table::fread(here::here("data/opentargets/NORMENT_PD_2023_Braintyphoon_cFDR_aggregate_OT_long_GCG.txt")) %>% 
+    dplyr::mutate(trait1 = "PD", trait2 = "GCG") %>% 
+    dplyr::select(trait1, trait2, locusnum, SNP, chrnum, chrpos, pval_Dx, fdr_Dx, conjfdr, Gene) 
+st15 <- full_join(pd_gcg_conjfdr, ad_gcg_conjfdr)
+data.table::fwrite(st15, here::here("data/suppl_tables/st15_conjfdr_gcg.txt"), sep = "\t")
+
+```
+
+### Suppl Fig8
+
+```{r suppl-fig8-glutamine-ad}
+
+glutamine <- data.table::fread(here::here("data/pleiofdr/PGC_AD_2021_noUKB_no23andMe_Glutamine_result.mat.csv"))
+
+glutamine_loci <- data.table::fread(here::here("data/pleiofdr/PGC_AD_2021_noUKB_no23andMe_Glutamine_conjfdr_0.05_loci.csv")) %>%
+    dplyr::select(chrnum, chrpos)  %>%
+    dplyr::rename(chr = chrnum,
+                  bp = chrpos)
+
+glutamine_df <- glutamine %>%
+    dplyr::rename(
+        P = FDR
+    )
+
+data_cum <- glutamine_df %>%
+    dplyr::mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    group_by(chr) %>%
+    summarise(max_bp = max(bp)) %>%
+    dplyr::mutate(bp_add = lag(cumsum(max_bp), default = 0)) %>%
+    dplyr::select(chr, bp_add)
+
+gwas_data <- glutamine_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    inner_join(data_cum, by = "chr") %>%
+    mutate(bp_cum = bp + bp_add)
+
+axis_set <- gwas_data %>%
+    group_by(chr) %>%
+    summarize(center = mean(bp_cum))
+
+ylim <- gwas_data %>%
+    dplyr::rename(p = P) %>%
+    dplyr::filter(p == min(p)) %>%
+    dplyr::mutate(ylim = abs(floor(log10(p))) + 2) %>%
+    pull(ylim)
+
+sig <- 0.05
+
+glut_loci <- left_join(glutamine_loci, gwas_data) %>%
+    dplyr::rename(label = SNP)
+
+manhplot_glut_df <- gwas_data %>%
+    left_join(glut_loci) %>%
+    mutate(label = case_when(label == "rs2840676" ~ "LEPR",
+                             label == "rs114731985" ~ "MFSD6",
+                             label == "rs1190447" ~ "EIF4E2",
+                             label == "rs56030824" ~ "SLC39A13",
+                             label == "rs6582670" ~ "SLC38A2",
+                             label == "rs4759016" ~ "SMARCC2",
+                             label == "rs120963" ~ "EARS2",
+                             label == "rs55900782" ~ "MTSS2",
+                             label == "rs3826408" ~ "ACADVL",
+                             label == "rs62063264" ~ "MAPT",
+                             label == "rs36084354" ~ "ARHGAP45",
+                             label == "rs112849259" ~ "NECTIN2",
+                             label == "rs484195" ~ "APOE",
+                             label == "rs12985029" ~ "CD33",
+
+    )) %>%
+    rename(p = P) %>%
+    dplyr::mutate(title = "AD | Glutamine")
+
+glutamine_ad_manhplot <- manhplot_glut_df %>%
+    ggplot(aes(x = bp_cum, y = -log10(p))) +
+    geom_hline(yintercept = -log10(sig), color = "grey25", linetype = "dashed", lwd = 0.5) +
+    geom_point(size = 1.5, colour = "#1f78b4") +
+    geom_point(
+        data = manhplot_glut_df %>% filter(!is.na(label)),
+        shape = 21, size = 4, color = "black", fill = "#1f78b4") +
+    scale_x_continuous(expand = c(.01,.01), label = axis_set$chr, breaks = axis_set$center) +
+    scale_y_continuous(expand = c(.02,.02), limits = c(0, 8), breaks = c(0,2,4,6,8)) +
+    labs(x = "Chromosome",
+         y = expression(paste('-log'[10],'(', 'conjFDR',')'))) +
+    ggrepel::geom_label_repel(aes(label = label),
+                             fontface = "italic",  # Italic text
+                             color = "grey25",     # Set font color
+                             box.padding = 0.2,    # Space around text
+                             point.padding = 0.2,  # Space between point and label
+                             segment.size = 0.3,   # Line connecting label to point
+                             label.padding = 0.1,  # Padding inside the label
+                             label.size = 0,       # Remove border around label
+                             fill = "transparent",
+                             nudge_y = 0.5,
+                             size = 6.5
+                             ) +
+    theme_minimal() +
+    theme(
+        panel.background = element_rect(fill = "white", colour = "white"),
+        plot.background = element_rect(fill = "white", colour = "white"),
+        legend.background = element_rect(fill = "white", colour = "white"),
+        legend.key = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        axis.line.x = element_line(color = "black", size = 0.6),
+        axis.line.y = element_line(color = "black", size = 0.6),  # Ensure y-axis is also visible
+        legend.position = "none",
+        axis.text = element_text(size = 20, colour = "black"),
+        axis.title.x = element_text(size = 20,  colour = "black",  margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 20,  colour = "black",  margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.text.x = element_text(colour = "black", size = 20, face = "bold"),
+        strip.text.y = element_text(colour = "black", size = 20, face = "bold"),
+        strip.background.x = element_rect(colour = "transparent", fill = "transparent"),
+        strip.background.y = element_rect(colour = "transparent", fill = "transparent"),
+        strip.placement.y = "bottom"
+    ) +
+    facet_wrap(~title)
+
+```
+
+
+```{r suppl-fig8-glutamine-pd}
+
+library(biomaRt)
+mart <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+glutamine_snp2gene <- data.table::fread(here::here("data/opentargets/NORMENT_PD_2023_Braintyphoon_Glutamine_snp2gene_OT.txt")) %>% 
+    dplyr::select(SNP, Gene)
+
+ens_ids <- glutamine_snp2gene$Gene
+gene_map <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol"),
+                  filters = "ensembl_gene_id",
+                  values = ens_ids,
+                  mart = mart)
+glut_label <- gene_map %>% 
+    rename(Gene = ensembl_gene_id) %>% 
+    left_join(glutamine_snp2gene)
+
+glutamine_pd <- data.table::fread(here::here("data/pleiofdr/NORMENT_PD_2023_Braintyphoon_Glutamine_result.mat.csv"))
+
+glutamine_pd_loci <- data.table::fread(here::here("data/pleiofdr/NORMENT_PD_2023_Braintyphoon_Glutamine_conjfdr_0.05_loci.csv")) %>%
+    dplyr::select(chrnum, chrpos)  %>%
+    dplyr::rename(chr = chrnum,
+                  bp = chrpos)
+
+glutamine_pd_df <- glutamine_pd %>%
+    dplyr::rename(
+        P = FDR
+    )
+
+data_cum <- glutamine_pd_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    group_by(chr) %>%
+    summarise(max_bp = max(bp)) %>%
+    mutate(bp_add = lag(cumsum(max_bp), default = 0)) %>%
+    dplyr::select(chr, bp_add)
+
+gwas_data <- glutamine_pd_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    inner_join(data_cum, by = "chr") %>%
+    mutate(bp_cum = bp + bp_add)
+
+axis_set <- gwas_data %>%
+    group_by(chr) %>%
+    summarize(center = mean(bp_cum))
+
+ylim <- gwas_data %>%
+    rename(p = P) %>%
+    filter(p == min(p)) %>%
+    mutate(ylim = abs(floor(log10(p))) + 2) %>%
+    pull(ylim)
+
+sig <- 0.05
+
+glutamine_loci <- left_join(glutamine_pd_loci, gwas_data) %>%
+    left_join(glut_label) %>% 
+    dplyr::rename(label = hgnc_symbol) 
+    
+manhplot_glutamine_pd_df <- gwas_data %>%
+    left_join(glutamine_loci) %>%
+    rename(p = P) %>%
+    dplyr::mutate(title = "PD | Glutamine")
+
+glutamine_pd_manhplot <- manhplot_glutamine_pd_df %>%
+    ggplot(aes(x = bp_cum, y = -log10(p))) +
+    geom_hline(yintercept = -log10(sig), color = "grey25", linetype = "dashed", lwd = 0.5) +
+    geom_point(size = 1.5, colour = "#b2df8a") +
+    geom_point(
+        data = manhplot_glutamine_pd_df %>% filter(!is.na(label)),
+        shape = 21, size = 4, color = "black", fill = "#b2df8a") +
+    scale_x_continuous(expand = c(.01,.01), label = axis_set$chr, breaks = axis_set$center) +
+    scale_y_continuous(expand = c(.02,.02), limits = c(0, 8), breaks = c(0,2,4,6,8)) +
+    labs(x = "Chromosome",
+         y = expression(paste('-log'[10],'(', 'conjFDR',')'))) +
+    ggrepel::geom_label_repel(aes(label = label),
+                             fontface = "italic",  # Italic text
+                             color = "grey25",     # Set font color
+                             box.padding = 0.2,    # Space around text
+                             point.padding = 0.2,  # Space between point and label
+                             segment.size = 0.3,   # Line connecting label to point
+                             label.padding = 0.1,  # Padding inside the label
+                             label.size = 0,       # Remove border around label
+                             fill = "transparent",
+                             nudge_y = 0.5,
+                             size = 6.5
+                             ) +
+    theme_minimal() +
+    theme(
+        panel.background = element_rect(fill = "white", colour = "white"),
+        plot.background = element_rect(fill = "white", colour = "white"),
+        legend.background = element_rect(fill = "white", colour = "white"),
+        legend.key = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        axis.line.x = element_line(color = "black", size = 0.6),
+        axis.line.y = element_line(color = "black", size = 0.6),  # Ensure y-axis is also visible
+        legend.position = "none",
+        axis.text = element_text(size = 20, colour = "black"),
+        axis.title.x = element_text(size = 20,  colour = "black",  margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 20,  colour = "black",  margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.text.x = element_text(colour = "black", size = 20, face = "bold"),
+        strip.text.y = element_text(colour = "black", size = 20, face = "bold"),
+        strip.background.x = element_rect(colour = "transparent", fill = "transparent"),
+        strip.background.y = element_rect(colour = "transparent", fill = "transparent"),
+        strip.placement.y = "bottom"
+    ) +
+    facet_wrap(~title)
+
+combined_pleiofdr <- cowplot::plot_grid(
+    glutamine_ad_manhplot,
+    glutamine_pd_manhplot,
+    ncol = 1,
+    nrow = 2,
+    labels = c("a", "b"),
+    label_size = 20,
+    label_fontface = "bold"
+)
+
+ggplot2::ggsave(
+    filename = "SupplFig8_manhattan_cFDR_AD_PD_glutamine.png",
+    plot = combined_pleiofdr,
+    path = here::here("img/suppl_figs/"),
+    width = 20,
+    height = 16,
+    device = "png",
+    dpi = 400,
+    type = "cairo"
+)
+
+```
+
+### Suppl Fig9
+
+```{r suppl-fig9-ad-gcg}
+
+library(tidyverse)
+
+GCG <- data.table::fread(here::here("data/pleiofdr/AD_GCG_result.mat.csv"))
+
+GCG_loci <- data.table::fread(here::here("data/pleiofdr/PGC_AD_2021_noUKB_no23andMe_GCG_conjfdr_0.05_loci.csv")) %>%
+    dplyr::select(chrnum, chrpos)  %>%
+    dplyr::rename(chr = chrnum,
+                  bp = chrpos)
+
+GCG_df <- GCG %>%
+    dplyr::rename(
+        P = FDR
+    )
+
+data_cum <- GCG_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    group_by(chr) %>%
+    summarise(max_bp = max(bp)) %>%
+    mutate(bp_add = lag(cumsum(max_bp), default = 0)) %>%
+    dplyr::select(chr, bp_add)
+
+gwas_data <- GCG_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    inner_join(data_cum, by = "chr") %>%
+    mutate(bp_cum = bp + bp_add)
+
+axis_set <- gwas_data %>%
+    group_by(chr) %>%
+    summarize(center = mean(bp_cum))
+
+ylim <- gwas_data %>%
+    rename(p = P) %>%
+    filter(p == min(p)) %>%
+    mutate(ylim = abs(floor(log10(p))) + 2) %>%
+    pull(ylim)
+
+sig <- 0.05
+
+glut_loci <- left_join(GCG_loci, gwas_data) %>%
+    dplyr::rename(label = SNP)
+
+manhplot_glut_df <- gwas_data %>%
+    left_join(glut_loci) %>%
+    mutate(label = case_when(label == "rs7412" ~ "APOE", 
+                             label == "rs3826688" ~ "APOC1", 
+                             label == "rs2452170" ~ "MAMSTR",
+    )) %>%
+    rename(p = P) %>%
+    dplyr::mutate(title = "AD | GCG")
+
+gcg_ad_manhplot <- manhplot_glut_df %>%
+    ggplot(aes(x = bp_cum, y = -log10(p))) +
+    geom_hline(yintercept = -log10(sig), color = "grey25", linetype = "dashed", lwd = 0.5) +
+    geom_point(size = 1.5, colour = "#1f78b4") +
+    geom_point(
+        data = manhplot_glut_df %>% filter(!is.na(label)),
+        shape = 21, size = 4, color = "black", fill = "#1f78b4") +
+    scale_x_continuous(expand = c(.01,.01), label = axis_set$chr, breaks = axis_set$center) +
+    scale_y_continuous(expand = c(.02,.02), limits = c(0, 8), breaks = c(0,2,4,6,8)) +
+    labs(x = "Chromosome",
+         y = expression(paste('-log'[10],'(', 'conjFDR',')'))) +
+    ggrepel::geom_label_repel(aes(label = label),
+                             fontface = "italic",  # Italic text
+                             color = "grey25",     # Set font color
+                             box.padding = 0.2,    # Space around text
+                             point.padding = 0.2,  # Space between point and label
+                             segment.size = 0.3,   # Line connecting label to point
+                             label.padding = 0.1,  # Padding inside the label
+                             label.size = 0,       # Remove border around label
+                             fill = "transparent",
+                             nudge_y = 0.5,
+                             size = 6.5
+                             ) +
+    theme_minimal() +
+    theme(
+        panel.background = element_rect(fill = "white", colour = "white"),
+        plot.background = element_rect(fill = "white", colour = "white"),
+        legend.background = element_rect(fill = "white", colour = "white"),
+        legend.key = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        axis.line.x = element_line(color = "black", size = 0.6),
+        axis.line.y = element_line(color = "black", size = 0.6),  # Ensure y-axis is also visible
+        legend.position = "none",
+        axis.text = element_text(size = 20, colour = "black"),
+        axis.title.x = element_text(size = 20,  colour = "black",  margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 20,  colour = "black",  margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.text.x = element_text(colour = "black", size = 20, face = "bold"),
+        strip.text.y = element_text(colour = "black", size = 20, face = "bold"),
+        strip.background.x = element_rect(colour = "transparent", fill = "transparent"),
+        strip.background.y = element_rect(colour = "transparent", fill = "transparent"),
+        strip.placement.y = "bottom"
+    ) +
+    facet_wrap(~title)
+gcg_ad_manhplot
+```
+
+```{r suppl-fig9}
+
+gcg_pd <- data.table::fread(here::here("data/pleiofdr/NORMENT_PD_2023_Braintyphoon_GCG_result.mat.csv"))
+
+gcg_pd_loci <- data.table::fread(here::here("data/pleiofdr/NORMENT_PD_2023_Braintyphoon_GCG_conjfdr_0.05_loci.csv")) %>%
+    dplyr::select(chrnum, chrpos)  %>%
+    dplyr::rename(chr = chrnum,
+                  bp = chrpos)
+
+gcg_pd_df <- gcg_pd %>%
+    dplyr::rename(
+        P = FDR
+    )
+
+data_cum <- gcg_pd_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    group_by(chr) %>%
+    summarise(max_bp = max(bp)) %>%
+    mutate(bp_add = lag(cumsum(max_bp), default = 0)) %>%
+    dplyr::select(chr, bp_add)
+
+gwas_data <- gcg_pd_df %>%
+    mutate(chr = as.numeric(CHR),
+           bp = as.numeric(BP)) %>%
+    inner_join(data_cum, by = "chr") %>%
+    mutate(bp_cum = bp + bp_add)
+
+axis_set <- gwas_data %>%
+    group_by(chr) %>%
+    summarize(center = mean(bp_cum))
+
+ylim <- gwas_data %>%
+    rename(p = P) %>%
+    filter(p == min(p)) %>%
+    mutate(ylim = abs(floor(log10(p))) + 2) %>%
+    pull(ylim)
+
+sig <- 0.05
+
+gcg_loci <- left_join(gcg_pd_loci, gwas_data) %>%
+    dplyr::rename(label = SNP)
+
+manhplot_gcg_pd_df <- gwas_data %>%
+    left_join(gcg_loci) %>%
+    mutate(label = case_when(label == "rs80051818" ~ "EIF2B4", #
+                             label == "rs10445684" ~ "CCNT2-AS1", 
+    )) %>%
+    rename(p = P) %>%
+    dplyr::mutate(title = "PD | GCG")
+
+gcg_pd_manhplot <- manhplot_gcg_pd_df %>%
+    ggplot(aes(x = bp_cum, y = -log10(p))) +
+    geom_hline(yintercept = -log10(sig), color = "grey25", linetype = "dashed", lwd = 0.5) +
+    geom_point(size = 1.5, colour = "#b2df8a") +
+    geom_point(
+        data = manhplot_gcg_pd_df %>% filter(!is.na(label)),
+        shape = 21, size = 4, color = "black", fill = "#b2df8a") +
+    scale_x_continuous(expand = c(.01,.01), label = axis_set$chr, breaks = axis_set$center) +
+    scale_y_continuous(expand = c(.02,.02), limits = c(0, 3), breaks = c(0,1,2,3,4)) +
+    labs(x = "Chromosome",
+         y = expression(paste('-log'[10],'(', 'conjFDR',')'))) +
+    ggrepel::geom_label_repel(aes(label = label),
+                             fontface = "italic",  # Italic text
+                             color = "grey25",     # Set font color
+                             box.padding = 0.2,    # Space around text
+                             point.padding = 0.2,  # Space between point and label
+                             segment.size = 0.3,   # Line connecting label to point
+                             label.padding = 0.1,  # Padding inside the label
+                             label.size = 0,       # Remove border around label
+                             fill = "transparent",
+                             nudge_y = 0.5,
+                             size = 6.5
+                             ) +
+    theme_minimal() +
+    theme(
+        panel.background = element_rect(fill = "white", colour = "white"),
+        plot.background = element_rect(fill = "white", colour = "white"),
+        legend.background = element_rect(fill = "white", colour = "white"),
+        legend.key = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        axis.line.x = element_line(color = "black", size = 0.6),
+        axis.line.y = element_line(color = "black", size = 0.6),  # Ensure y-axis is also visible
+        legend.position = "none",
+        axis.text = element_text(size = 20, colour = "black"),
+        axis.title.x = element_text(size = 20,  colour = "black",  margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(size = 20,  colour = "black",  margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.text.x = element_text(colour = "black", size = 20, face = "bold"),
+        strip.text.y = element_text(colour = "black", size = 20, face = "bold"),
+        strip.background.x = element_rect(colour = "transparent", fill = "transparent"),
+        strip.background.y = element_rect(colour = "transparent", fill = "transparent"),
+        strip.placement.y = "bottom"
+    ) +
+    facet_wrap(~title)
+
+combined_pleiofdr <- cowplot::plot_grid(
+    gcg_ad_manhplot,
+    gcg_pd_manhplot,
+    ncol = 1,
+    nrow = 2,
+    labels = c("a", "b"),
+    label_size = 20,
+    label_fontface = "bold"
+)
+
+ggplot2::ggsave(
+    filename = "SupplFig9_manhattan_cFDR_AD_PD_GCG.png",
+    plot = combined_pleiofdr,
+    path = here::here("img/suppl_figs/"),
+    width = 20,
+    height = 16,
+    device = "png",
+    dpi = 400,
+    type = "cairo"
+)
+
+```
+
+## Gene Ontology
+
+```{r go}
+
+pacman::p_load(
+    tidyverse,
+    RColorBrewer,
+    data.table,
+    clusterProfiler,
+    fgsea,
+    AnnotationDbi,
+    org.Hs.eg.db,
+    RecordLinkage
+)
+
+dict <- data.table::fread(here::here("data-raw/metaboDict_240109.txt"),
+                          header = TRUE,
+                          data.table = FALSE)
+version = "c5.go.bp" 
+
+gmt <- fgsea::gmtPathways(here::here("data/go/c5.go.bp.v2024.1.Hs.entrez.gmt"))
+paths <- data.frame(path=rep(names(gmt),lengths(gmt)),genes=unlist(gmt))
+
+terms <- as_tibble(paths)
+colnames(terms) <- c("gs_name","entrez_gene")
+terms$entrez_gene <- as.numeric(terms$entrez_gene)
+
+allGenTest <- c()
+for(dxsum in c("PGC_AD_2021_noUKB_no23andMe")){ #"PGC_AD_2021_noUKB_no23andMe", "IPDGC_PD_2018", "IPDGC_PD_2014_lift", NORMENT_PD_2023_Braintyphoon
+    dfa <- data.table::fread(here::here("data", "opentargets", paste0(dxsum, "_cFDR_aggregate_OT.txt")), header = TRUE, data.table = FALSE, fill = TRUE)
+    keyOT <- AnnotationDbi::select(org.Hs.eg.db,
+                                   keys = unique(dfa$Gene),
+                                   columns = c("ENSEMBL", "ENTREZID"),
+                                   keytype = "ENSEMBL") %>%
+        distinct(ENSEMBL, .keep_all = TRUE)
+    
+    geneList <- left_join(keyOT, dfa, by=c("ENSEMBL"="Gene"))
+    geneList <- geneList[complete.cases(geneList),]
+    genes <- as.numeric(unique(geneList$ENTREZID))
+    allGenTestDx <- as.data.frame(enricher(genes, TERM2GENE=terms,
+                                           minGSSize = 5, maxGSSize=30000,
+                                           pvalueCutoff = Inf, pAdjustMethod = "none", qvalueCutoff=Inf))
+    allGenTestDx$Dx <- dxsum
+    allGenTest <- rbind(allGenTest, allGenTestDx)
+    restab <- c()
+    for(metabo in unique(dfa$metabolite)){
+        geneListM <- geneList[geneList$metabolite==metabo,]
+        genes <- as.numeric(unique(geneListM$ENTREZID))
+        ans.dis <- as.data.frame(enricher(genes, TERM2GENE = terms,
+                                          minGSSize = 1, maxGSSize = 30000,
+                                          pvalueCutoff = Inf, pAdjustMethod = "BH"))
+        if(nrow(ans.dis)>0){
+            ans.dis$metabo <- metabo
+            restab <- rbind(restab,ans.dis)}
+    }
+    write.table(restab, file = here::here("data", "opentargets", paste0(version, "_", dxsum, "_fisherAll.txt")), sep = "\t", quote = FALSE, row.names = FALSE, col.names = TRUE)
+}
+write.table(allGenTest, file = here::here("data", "opentargets", paste0(version, "_aggregateGenes_fisherAll.txt")), sep = "\t", quote = FALSE, row.names = FALSE, col.names = TRUE)
+
+######### 
+dfad <- data.table::fread(here::here("data", "opentargets", paste0(version, "_PGC_AD_2021_noUKB_no23andMe_fisherAll.txt")), header = TRUE, data.table = FALSE)
+dfpd <- data.table::fread(here::here("data", "opentargets", paste0(version, "_NORMENT_PD_2023_Braintyphoon_fisherAll.txt")), header = TRUE, data.table = FALSE)
+df <- rbind(dfad, dfpd)
+
+df$pathSize <- as.numeric(gsub("/.*", "", df$BgRatio))
+df$dx <- c(rep("AD", nrow(dfad)), rep("PD", nrow(dfpd))) 
+
+dfp <- df[df$qvalue<.05,]
+#dfp <- df[df$p.adjust<.05,]
+dfp <- dfp[dfp$Count>4,]
+dfp <- dfp[dfp$pathSize<500,]
+
+dfps <- dfp[order(dfp$qvalue),]
+
+similarity <- function(a, b) {
+    if (is.na(a) || is.na(b)) return(NA)
+    a_set <- unlist(strsplit(a, "/"))
+    b_set <- unlist(strsplit(b, "/"))
+    if (length(a_set) == 0 || length(b_set) == 0) return(NA)
+    intersect_len <- length(intersect(a_set, b_set))
+    min_len <- min(length(a_set), length(b_set))
+    if (min_len == 0) return(NA)
+    return(intersect_len / min_len)
+}
+
+# Function to filter terms based on similarity threshold
+filter_terms <- function(df, threshold = 0.8) {
+    df <- df[order(df$qvalue), ]
+    to_keep <- rep(TRUE, nrow(df))
+    
+    for (i in 1:(nrow(df) - 1)) {
+        if (!to_keep[i]) next
+        for (j in (i + 1):nrow(df)) {
+            if (!to_keep[j]) next
+            sim_value <- similarity(df$geneID[i], df$geneID[j])
+            if (!is.na(sim_value) && sim_value >= threshold) {
+                to_keep[j] <- FALSE
+            }
+        }
+    }
+    return(df[to_keep, ])
+}
+
+dfpsf <- dfps %>% group_by(dx) %>%
+    group_modify(~ filter_terms(.x)) %>%
+    ungroup()
+
+dfs_top <- rbind(dfpsf[dfpsf$dx == "AD", ][1:5, ], dfpsf[dfpsf$dx == "PD", ][1:5, ])
+
+dfs_top$term <- gsub("_"," ",dfs_top$ID)
+dfs_top$term <- gsub("GOBP","",dfs_top$term)
+dfs_top$term <- str_to_title(dfs_top$term)
+
+dfs_top$dx <- factor(dfs_top$dx, levels = unique(dfs_top$dx))
+dfs_top <- dfs_top %>%
+    arrange(dx, pvalue) %>%
+    mutate(term_dx = paste(dx, term)) %>%
+    mutate(term_dx = factor(term_dx, levels = term_dx)) %>%
+    dplyr::filter(!is.na(dx))
+
+dfs_top$term <- as.factor(dfs_top$term)
+
+data.table::fwrite(dfs_top, here::here("data/opentargets/GO_top_terms.txt"))
+
+```
+
+### ST16
+
+```{r suppl-table-16}
+
+dict_go <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(metabolite = sumstatName) %>%
+    dplyr::select(metabolite, prettyName) %>% 
+    dplyr::filter(!is.na(metabolite)) 
+
+st16 <- data.table::fread(here::here("data/opentargets/c5.go.bp_PGC_AD_2021_noUKB_no23andMe_fisherAll.txt"), header = TRUE, data.table = FALSE) %>% 
+    dplyr::mutate(disorder = "AD",
+                  term = gsub("GOBP_", "", ID),
+                  term = gsub("_", " ", term),
+                  term = str_to_sentence(term)) %>% 
+    dplyr::rename(metabolite = metabo,
+                  pval = pvalue,
+                  qval = qvalue) %>% 
+    left_join(dict_go) %>% 
+    dplyr::select(-metabolite) %>% 
+    dplyr::rename(metabolite = prettyName) %>% 
+    dplyr::select(disorder, metabolite, term, GeneRatio, BgRatio, pval, qval)
+
+data.table::fwrite(st16, here::here("data/suppl_tables/st16_go_ad_metabo.txt"), sep = "\t")
+
+```
+
+### ST17 
+
+```{r suppl-table-17}
+
+dict_go <- data.table::fread(here::here("data-raw/metaboDict_240109.txt")) %>%
+    dplyr::rename(metabolite = sumstatName) %>%
+    dplyr::select(metabolite, prettyName) %>% 
+    dplyr::filter(!is.na(metabolite)) 
+
+st17 <- data.table::fread(here::here("data/opentargets/c5.go.bp_NORMENT_PD_2023_Braintyphoon_fisherAll.txt"), header = TRUE, data.table = FALSE) %>% 
+    dplyr::mutate(disorder = "PD",
+                  term = gsub("GOBP_", "", ID),
+                  term = gsub("_", " ", term),
+                  term = str_to_sentence(term)) %>% 
+    dplyr::rename(metabolite = metabo,
+                  pval = pvalue,
+                  qval = qvalue) %>% 
+    left_join(dict_go) %>% 
+    dplyr::select(-metabolite) %>% 
+    dplyr::rename(metabolite = prettyName) %>% 
+    dplyr::select(disorder, metabolite, term, GeneRatio, BgRatio, pval, qval)
+st17
+
+data.table::fwrite(st17, here::here("data/suppl_tables/st17_go_pd_metabo.txt"), sep = "\t")
+
+```
+
+### venn
+
+```{r venn-plot}
+
+pacman::p_load(eulerr, ggplot2, dplyr)
+
+df_ad <- data.table::fread(here::here("data/opentargets/PGC_AD_2021_noUKB_no23andMe_cFDR_aggregate_OT.txt")) %>% 
+    dplyr::distinct(Gene, .keep_all = TRUE) 
+df_pd <- data.table::fread(here::here("data/opentargets/NORMENT_PD_2023_Braintyphoon_cFDR_aggregate_OT.txt")) %>% 
+    dplyr::distinct(Gene, .keep_all = TRUE)
+
+# Example gene sets (unique and shared genes for AD and PD)
+unique_genes_ad <- df_ad$Gene
+unique_genes_pd <- df_pd$Gene
+
+# Calculate intersections and unique elements
+genes_ad_only <- setdiff(unique_genes_ad, unique_genes_pd)
+genes_pd_only <- setdiff(unique_genes_pd, unique_genes_ad)
+shared_genes <- intersect(unique_genes_ad, unique_genes_pd)
+
+ad_genes <- length(genes_ad_only) 
+pd_genes <- length(genes_pd_only)
+overlap_genes <- length(shared_genes) 
+
+fit <- euler(c(
+    AD = ad_genes,
+    PD = pd_genes,            
+    "AD&PD" = overlap_genes             
+), shape = "circle")
+
+venn_cFDR_plot <- plot(
+    fit,
+    fills = list(
+        fill = c("#1f78b4", "#b2df8a", "grey")
+        #alpha = 0.75
+    ),
+    edges = list(
+        lty = 1,
+        lwd = 5,
+        col = 'white'
+    ),
+    labels = list(
+        labels = c("AD", "PD"),
+        col = "black",
+        font = "calibri",
+        fontface = "bold",
+        cex = 1.8,
+        lineheight = 1
+    ),
+    quantities = list(
+        type = "counts",
+        labels = c(ad_genes, pd_genes, overlap_genes),
+        col = "black",
+        font = "calibri",
+        fontface = "plain",
+        cex = 1.8,
+        lineheight = 1
+    ),
+    key.width = 3,
+    key.height = 1
+)
+venn_cFDR_plot
+
+```
+
+### barplot
+
+```{r}
+
+dfs_top <- data.table::fread(here::here("data/opentargets/GO_top_terms.txt"))
+barplot <- ggplot(dfs_top, aes(y = reorder(term, -pvalue), x = -log10(pvalue), fill = dx)) +
+    geom_col(color = "black", width = 0.7) +  # Use geom_col for custom x values
+    scale_fill_manual(values = c("AD" = "#1f78b4", "PD" = "#b2df8a")) +
+    theme_bw() +
+    labs(title = "", x = "\n-log10(P-value)", y = "", fill = "") +
+    facet_wrap(~ dx, scales = "free_y", ncol = 1) +
+    coord_cartesian(xlim = c(0, ceiling(max(-log10(dfs_top$pvalue)))), clip = "off") +  # Ensure no clipping
+    theme(panel.grid = element_blank(),
+          axis.title.x = element_text(size = 20, colour = "black", margin = margin(t = 15, r = 0, b = 0, l = 0)),
+          axis.title.y = element_text(size = 20, colour = "black", margin = margin(t = 0, r = 15, b = 0, l = 0)),
+          axis.text = element_text(size = 20, color = "black"),
+          legend.text = element_text(size = 20, color = "black"),
+          legend.title = element_text(size = 20, color = "black"),
+          legend.position = "none",
+          strip.text = element_text(color = "black", face = "bold", size = 20),
+          strip.background = element_rect(fill = "white", color = NA),
+          panel.border = element_blank(),
+          axis.line = element_line(color = "black")
+    )
+barplot
+
+```
+
+### Fig5
+
+```{r}
+
+library(magick)
+library(cowplot)
+
+combined_cFDR <- plot_grid(
+    venn_cFDR_plot,  
+    barplot,         
+    ncol = 2,        
+    labels = c("b", "c"),        
+    label_size = 20,             
+    label_fontface = "bold",     
+    rel_widths = c(0.8, 1.5)       
+)
+combined_cFDR
+
+fig5 <- ggpubr::ggarrange(
+  gcg_ad_manhplot,
+  combined_cFDR,
+  ncol = 1,
+  nrow = 2,
+  labels = c("a", ""),       
+  font.label = list(size = 20, face = "bold")
+)
+
+ggsave(
+    #here::here("img/main_figs/Fig5_conjFDR_400dpi.tiff"),
+    here::here("img/main_figs/Fig5_conjFDR_400dpi.pdf"),
+    #device = 'tiff',
+    device = 'pdf',
+    plot = fig5,
+    width = 18,
+    height = 16,
+    units = "in",
+    dpi = 400,
+    bg = "white"
+)
+
+```
+
+## Gene set enrichment
+
+### ABA 
+
+```{r aba}
+
+library(here)
+library(ggseg)
+library(patchwork)
+library(cowplot)
+
+process_enrichment_plot <- function(sumstats, Dx) {
+  # Load gene list
+  genList <- fread(here("data/opentargets", paste0(sumstats, "_cFDR_aggregate_symbolsUnique.txt")),
+                   header = TRUE, data.table = FALSE, fill = TRUE)
+  
+  # Load ABA expression
+  df <- fread(here("data/annot/aba_expression_base.csv"), header = TRUE, data.table = FALSE)
+  df_nona <- df %>% na.omit() %>% filter(hemisphere == "L")
+  
+  # Keep only genes in ABA data
+  genList <- intersect(genList$V1, colnames(df_nona))
+  
+  # Compute enrichment per structure
+  enrichment_results <- apply(df_nona, 1, function(row) {
+    structure <- row["label"]
+    all_values <- row[6:ncol(df_nona)]
+    dx_values <- all_values[names(all_values) %in% genList]
+    non_dx_values <- all_values[!names(all_values) %in% genList]
+    
+    if (length(non_dx_values) > 0 && length(dx_values) > 0) {
+      test_result <- wilcox.test(as.numeric(dx_values), as.numeric(non_dx_values))
+      p_value <- test_result$p.value
+      W_value <- test_result$statistic
+    } else {
+      p_value <- NA
+      W_value <- NA
+    }
+    data.frame(structure = structure, p_value = p_value, W_value = W_value)
+  }) %>% do.call(rbind, .)
+  
+  enrichment_results$p_adjust <- p.adjust(enrichment_results$p_value, method = "BH")
+  
+  # Merge with atlas info
+  ATLASinfo <- fread(here("data/annot/aba_conversion_to_atlas.csv"), data.table = FALSE)
+  visDF <- ATLASinfo %>%
+    filter(hemi == "left") %>%
+    left_join(enrichment_results, by = c("shortID" = "structure")) %>%
+    na.omit() %>%
+    filter(p_value < 0.05)
+  
+  write.csv(visDF, here("data/annot", paste0("ggseg_aba_expression_enrichment_", Dx, ".csv")), row.names = FALSE)
+  
+  # Plot cortical (dk) and subcortical (aseg) regions
+  p1 <- ggplot(visDF %>% filter(atlas == "dk")) +
+    geom_brain(atlas = dk, hemi = "left", aes(fill = -log10(p_value))) +
+    theme_void() +
+    scale_fill_gradient(low = "white", high = "orange", limits = c(0, 2), name = "-log10(p)", na.value = "grey90",
+                        guide = guide_colorbar(title.position = "top", title.hjust = 0.5)) +
+    theme(legend.position = "right")
+  
+  p2 <- ggplot(visDF %>% filter(atlas == "aseg")) +
+    geom_brain(atlas = aseg, hemi = "left", aes(fill = -log10(p_value))) +
+    theme_void() +
+    scale_fill_gradient(low = "white", high = "orange", limits = c(0, 2), name = "-log10(p)", na.value = "grey90",
+                        guide = guide_colorbar(title.position = "top", title.hjust = 0.5)) +
+    theme(legend.position = "right")
+  
+  combined_plot <- p1 + p2 + plot_layout(ncol = 2, guides = "collect") & theme(
+    legend.position = "none",
+    plot.background = element_rect(fill = "white", color = NA),
+    legend.text = element_text(size = 20, color = "black"),
+    legend.title = element_text(size = 20, color = "black"),
+    legend.key.width = unit(1.5, "cm"),
+    legend.key.height = unit(0.6, "cm")
+  )
+  
+  combined_plot <- combined_plot +
+    cowplot::draw_label(Dx, x = -3.6, y = 4.3, size = 20, color = "black", fontface = "bold", hjust = 0, vjust = 1)
+  
+  ggsave(here("img/ind", paste0("ggseg_aba_expression_cortical_subcort_", Dx, ".png")),
+         combined_plot, height = 8, width = 10, units = "cm")
+  
+  # Return both plot and visDF
+  return(list(plot = combined_plot, visDF = visDF))
+}
+
+# Run independently for AD and PD
+ad_results <- process_enrichment_plot("PGC_AD_2021_noUKB_no23andMe", "AD")
+pd_results <- process_enrichment_plot("NORMENT_PD_2023_Braintyphoon", "PD")
+
+# combined_gg <- plot_grid(ad_results$plot,
+#                          pd_results$plot,
+#                          ncol = 1, nrow = 2) # optional labels
+# combined_gg # fix this (legend on the bottom)
+
+combined_gg <- ggpubr::ggarrange(
+    ad_results$plot,
+  pd_results$plot,
+    ncol = 1,
+    nrow = 2,
+    common.legend = TRUE,
+    legend = "bottom"
+)
+combined_gg
+
+# Extract visDF for writing results
+ad_visDF <- ad_results$visDF
+ad_visDF
+pd_visDF <- pd_results$visDF
+pd_visDF
+
+```
+
+### GTEX
+
+```{r}
+
+pacman::p_load(tidyverse,
+               RColorBrewer,
+               data.table,
+               clusterProfiler,
+               fgsea,
+               gganatogram,
+               cowplot)
+library("AnnotationDbi")
+library("org.Hs.eg.db")
+
+dict <- data.table::fread(
+    here::here("data-raw/metaboDict_240109.txt"),
+    header = TRUE,
+    data.table = FALSE
+)
+version = "gtex_v8_ts_general_DEG"
+
+gmt <- fgsea::gmtPathways(here::here("data/gtex/gtex_v8_ts_general_DEG.gmt"))
+paths <- data.frame(path = rep(names(gmt), lengths(gmt)), genes = unlist(gmt))
+
+key <- AnnotationDbi::select(org.Hs.eg.db, keys = paths$genes,columns = c("ENSEMBL", "ENTREZID"),keytype = "ENSEMBL")
+paths <- left_join(paths, key, by = c("genes" = "ENSEMBL"))
+paths <- paths[,c("path","ENTREZID")]
+paths <- paths[complete.cases(paths$"ENTREZID"),]
+paths <- paths[!duplicated(paths),]
+
+terms <- as_tibble(paths)
+colnames(terms) <- c("gs_name","entrez_gene")
+terms$entrez_gene <- as.numeric(terms$entrez_gene)
+
+allGenTest <- c()
+for(dxsum in c("PGC_AD_2021_noUKB_no23andMe", "NORMENT_PD_2023_Braintyphoon")){
+  dfa <- data.table::fread(here::here("data", "opentargets", paste0(dxsum, "_cFDR_aggregate_OT.txt")), header = TRUE, data.table = FALSE, fill = TRUE)
+  keyOT <- select(org.Hs.eg.db, keys = dfa$Gene,columns = c("ENSEMBL", "ENTREZID"),keytype = "ENSEMBL")
+  geneList <- left_join(keyOT,dfa,by=c("ENSEMBL"="Gene"))
+  geneList <- geneList[complete.cases(geneList),]
+  genes <- as.numeric(unique(geneList$ENTREZID))
+  restab <- c()
+  allGenTestDx <- as.data.frame(enricher(genes, TERM2GENE=terms,
+                                    minGSSize = 1,maxGSSize=15000,
+                                    pvalueCutoff = Inf,pAdjustMethod = "BH"))
+  allGenTestDx$dxsum <- dxsum
+  allGenTest <- rbind(allGenTest,allGenTestDx)
+}
+
+df <- allGenTest
+df$Dx[df$dxsum=="PGC_AD_2021_noUKB_no23andMe"] <- "AD"
+df$Dx[df$dxsum=="NORMENT_PD_2023_Braintyphoon"] <- "PD"
+
+dfp2 <- df[grep(".twoside",df$ID),]
+
+dfp2$ID <- tolower(gsub(".twoside","",dfp2$ID))
+dfp2$ID[dfp2$ID=="thyroid"] <- "thyroid_gland"
+dfp2$ID[dfp2$ID=="blood"] <- "aorta"
+dfp2$ID[dfp2$ID=="blood_vessel"] <- "leukocyte"
+dfp2$ID[dfp2$ID=="muscle"] <- "skeletal_muscle"
+dfp2$ID[dfp2$ID=="pituitary"] <- "pituitary_gland"
+dfp2$ID[dfp2$ID=="cervix_uteri"] <- "uterine_cervix"
+dfp2$ID[dfp2$ID=="bladder"] <- "urinary_bladder"
+
+anaplot <- full_join(hgFemale_key, dfp2, by=c("organ"="ID"))
+anaplot$value <- -log10(as.numeric(anaplot$pvalue))
+anaplot$value[anaplot$value>14] <- 14
+anaplot <- anaplot[complete.cases(anaplot),]
+anaplot <- anaplot[order(anaplot$Dx),]
+anaplot$type <- anaplot$Dx
+
+anaplot2 <- anaplot %>%
+    dplyr::mutate(fdr = p.adjust(pvalue, method = "fdr")) %>%
+    dplyr::filter(Dx == "AD")
+
+anaplot3 <- anaplot %>%
+    dplyr::mutate(fdr = p.adjust(pvalue, method = "fdr")) %>%
+    dplyr::filter(Dx == "PD")
+
+anat <- gganatogram(
+    data = anaplot,
+    fillOutline = 'white',
+    organism = 'human',
+    sex = 'female',
+    fill = "value"
+) +
+    theme_void() +
+    scale_fill_gradient(low = "white", high = "orange",
+                        limits = c(0, 15),      
+                        breaks = c(0, 5, 10, 15), 
+                        guide = guide_colorbar(title.position = "top", title.hjust = 0.5)
+                        ) +
+    facet_wrap( ~ type) +
+    labs(fill = "-log10(p)") +
+    coord_cartesian(clip = "off") +
+    theme(
+        plot.margin = margin(5, 40, 5, 5),
+        strip.text = element_text(size = 20, color = "black", face = "bold"),
+        legend.position = "bottom",
+        legend.key.width = unit(1.5, 'cm'),
+        legend.key.height = unit(0.6, 'cm'),
+        legend.text = element_text(size = 20, color = "black"),
+        legend.title = element_text(size = 20, color = "black"),
+    )
+anat
+
+```
+
+### Fig6
+
+```{r fig6}
+
+combined_bodymap <- ggpubr::ggarrange(
+    combined_gg,
+    anat,
+    ncol = 2,
+    nrow = 1,
+    labels = c("a", "b"),
+    font.label = list(
+        size = 20,
+        face = "bold",
+        color = "black"
+    )
+)
+combined_bodymap
+
+ggsave(
+    #here::here("img", "main_figs", "Fig6_brain_body-maps_400dpi.tiff"),
+    here::here("img", "main_figs", "Fig6_brain_body-maps_400dpi.pdf"),
+    plot = combined_bodymap,
+    width = 14,
+    height = 7,
+    units = "in",
+    dpi = 400,
+    #device = "tiff",
+    device = "pdf",
+    bg = "white"
+)
+```
+
